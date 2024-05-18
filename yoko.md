@@ -7,3 +7,7 @@ apt-get install libsparsehash-dev
 export MAX_JOBS=4
 python3 setup.py develop
 ```
+
+```
+python3 examples/profile_inference.py
+```
