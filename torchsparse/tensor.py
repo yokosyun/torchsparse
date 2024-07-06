@@ -37,6 +37,8 @@ class SparseTensor:
         self.feats = feats
         self.coords = coords
         self.stride = make_ntuple(stride, ndim=3)
+        self.non_dep_feats = None
+        self.non_dep_coords = None
         if spatial_range is None:
             self.spatial_range = None
         else:
