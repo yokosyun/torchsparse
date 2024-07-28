@@ -1963,7 +1963,8 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
 
   // int qsum_nnz = qkpos[k_vol].item<int>();
   // printf("%d", qsum_nnz);
-
+  const int LOAD_4_ELMS = 4;
+  const int LOAD_2_ELMS = 2;
   if (data_type_half && allow_fp16) {
     if (in_channel % 4 == 0 && out_channel % 4 == 0) {
       if (in_channel <= 16 || out_channel <= 16) {
@@ -1972,7 +1973,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
         fetch_on_demand_gemm_fp16_4_once<BLOCK_SIZE, N_LOOP, 8>
             <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                     DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
-               dim3(4, BLOCK_SIZE, 1)>>>(
+               dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
                 kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
                 reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
                 reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
@@ -1986,7 +1987,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
                                               4, 2, 2>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
-                 dim3(8, BLOCK_SIZE, 1)>>>(
+                 dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
                   kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
                   reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
                   reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
@@ -1999,7 +2000,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
                                         2>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
-                 dim3(8, BLOCK_SIZE, 1)>>>(
+                 dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
                   kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
                   reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
                   reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
@@ -2013,7 +2014,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
       fetch_on_demand_gemm_fp16_2<BLOCK_SIZE, N_LOOP, 8>
           <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                   DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
-             dim3(8, BLOCK_SIZE, 1)>>>(
+             dim3(BLOCK_SIZE / LOAD_2_ELMS, BLOCK_SIZE, 1)>>>(
               kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
               reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
               reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
@@ -2025,7 +2026,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
       fetch_on_demand_gemm_fp16_1<BLOCK_SIZE, N_LOOP, 8>
           <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                   DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
-             dim3(16, BLOCK_SIZE, 1)>>>(
+             dim3(BLOCK_SIZE, BLOCK_SIZE, 1)>>>(
               kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
               reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
               reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
@@ -2040,7 +2041,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
         fetch_on_demand_gemm_fp32_once<BLOCK_SIZE, N_LOOP, 8>
             <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                     DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
-               dim3(4, BLOCK_SIZE, 1)>>>(
+               dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
                 kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
                 in_feat.data_ptr<float>(), kernel.data_ptr<float>(),
                 out_feat.data_ptr<float>(), in_map_ptr, out_map_ptr);
@@ -2051,7 +2052,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
           fetch_on_demand_gemm_tf32<BLOCK_SIZE, N_LOOP, 8, 16, 8, 16, 4, 2, 2>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
-                 dim3(8, BLOCK_SIZE, 1)>>>(
+                 dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
                   kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
                   in_feat.data_ptr<float>(), kernel.data_ptr<float>(),
                   out_feat.data_ptr<float>(), in_map_ptr, out_map_ptr);
@@ -2061,7 +2062,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
           fetch_on_demand_gemm_fp32<32, N_LOOP, 8>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
-                 dim3(8, BLOCK_SIZE, 1)>>>(
+                 dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
                   kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
                   in_feat.data_ptr<float>(), kernel.data_ptr<float>(),
                   out_feat.data_ptr<float>(), in_map_ptr, out_map_ptr);
@@ -2073,7 +2074,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
       fetch_on_demand_gemm_fp32_2<BLOCK_SIZE, N_LOOP, 8>
           <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                   DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
-             dim3(8, BLOCK_SIZE, 1)>>>(
+             dim3(BLOCK_SIZE / LOAD_2_ELMS, BLOCK_SIZE, 1)>>>(
               kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
               in_feat.data_ptr<float>(), kernel.data_ptr<float>(),
               out_feat.data_ptr<float>(), in_map_ptr, out_map_ptr);
@@ -2083,7 +2084,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
       fetch_on_demand_gemm_fp32_1<BLOCK_SIZE, N_LOOP, 8>
           <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                   DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
-             dim3(16, BLOCK_SIZE, 1)>>>(
+             dim3(BLOCK_SIZE, BLOCK_SIZE, 1)>>>(
               kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
               in_feat.data_ptr<float>(), kernel.data_ptr<float>(),
               out_feat.data_ptr<float>(), in_map_ptr, out_map_ptr);
@@ -2145,6 +2146,7 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
   // loop over all kernel offsets
   int cur_idx = 0;
   // int stream_id = 0;
+  const int LOAD_4_ELMS = 4;
   for (int k = 0; k < k_vol; k++) {
     int cur_nnz = knnz_ptr[k];
 
@@ -2163,7 +2165,7 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
                                             4, 2, 2>
             <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                     DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
-               dim3(8, BLOCK_SIZE, 1)>>>(
+               dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
                 cur_nnz, in_channel, out_channel,
                 reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
                 reinterpret_cast<half *>(kernel.data_ptr<at::Half>() +
@@ -2176,7 +2178,7 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
         fetch_on_demand_gemm_no_fusion_fp16_1<BLOCK_SIZE, N_LOOP, 8>
             <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                     DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
-               dim3(16, BLOCK_SIZE, 1)>>>(
+               dim3(BLOCK_SIZE, BLOCK_SIZE, 1)>>>(
                 cur_nnz, in_channel, out_channel,
                 reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
                 reinterpret_cast<half *>(kernel.data_ptr<at::Half>() +
@@ -2193,7 +2195,7 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
                                               4, 2, 2>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
-                 dim3(8, BLOCK_SIZE, 1)>>>(
+                 dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
                   cur_nnz, in_channel, out_channel, in_feat.data_ptr<float>(),
                   (kernel.data_ptr<float>() + k * in_channel * out_channel),
                   out_feat.data_ptr<float>(), &in_map_ptr[cur_idx],
@@ -2204,7 +2206,7 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
           fetch_on_demand_gemm_no_fusion_fp32<BLOCK_SIZE, N_LOOP, 8>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
-                 dim3(8, BLOCK_SIZE, 1)>>>(
+                 dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
                   cur_nnz, in_channel, out_channel, in_feat.data_ptr<float>(),
                   (kernel.data_ptr<float>() + k * in_channel * out_channel),
                   out_feat.data_ptr<float>(), &in_map_ptr[cur_idx],
@@ -2216,7 +2218,7 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
         fetch_on_demand_gemm_no_fusion_fp32_1<BLOCK_SIZE, N_LOOP, 8>
             <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                     DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
-               dim3(16, BLOCK_SIZE, 1)>>>(
+               dim3(BLOCK_SIZE, BLOCK_SIZE, 1)>>>(
                 cur_nnz, in_channel, out_channel, in_feat.data_ptr<float>(),
                 (kernel.data_ptr<float>() + k * in_channel * out_channel),
                 out_feat.data_ptr<float>(), &in_map_ptr[cur_idx],
