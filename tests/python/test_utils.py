@@ -5,24 +5,25 @@ import torch
 
 
 def generate_feature_map(
-    shape,
-    num_points,
-    num_channels,
-    data_range=(-1, 1),
-    with_dense=True,
-    dtype=np.float16,
+        shape,
+        num_points,
+        num_channels,
+        data_range=(-1, 1),
+        with_dense=True,
+        dtype=np.float16,
 ):
     dense_shape = shape
     ndim = len(dense_shape)
     num_points = np.array(num_points)
     batch_size = len(num_points)
     batch_indices = []
-    coords_total = np.stack(np.meshgrid(*[np.arange(0, s) for s in shape]), axis=-1)
+    coords_total = np.stack(np.meshgrid(*[np.arange(0, s) for s in shape]),
+                            axis=-1)
     coords_total = coords_total.reshape(-1, ndim)
 
     for i in range(batch_size):
         np.random.shuffle(coords_total)
-        inds_total = coords_total[: num_points[i]]
+        inds_total = coords_total[:num_points[i]]
         inds_total = np.pad(
             inds_total,
             ((0, 0), (0, 1)),  # batch last
@@ -31,18 +32,18 @@ def generate_feature_map(
         )
         batch_indices.append(inds_total)
 
-    features = np.random.uniform(
-        data_range[0], data_range[1], size=[num_points.sum(), num_channels]
-    ).astype(dtype)
+    features = np.random.uniform(data_range[0],
+                                 data_range[1],
+                                 size=[num_points.sum(),
+                                       num_channels]).astype(dtype)
 
-    sparse_dict = dict(
-        [
-            ("feats", features),
-        ]
-    )
+    sparse_dict = dict([
+        ("feats", features),
+    ])
 
     if with_dense:
-        dense_feats = np.zeros([batch_size, num_channels, *dense_shape], dtype=dtype)
+        dense_feats = np.zeros([batch_size, num_channels, *dense_shape],
+                               dtype=dtype)
         start = 0
         for i, inds in enumerate(batch_indices):
             for j, ind in enumerate(inds):
@@ -62,7 +63,7 @@ def sparse_tensor_to_dense(
     num_channels=None,
     dtype=np.float16,
 ):
-    ts_pt = ts_tensor.F[: ts_tensor.C.shape[0]]
+    ts_pt = ts_tensor.F[:ts_tensor.C.shape[0]]
     ts_coords = ts_tensor.C
 
     np_ts_pt = np.array(ts_pt.detach().cpu())

@@ -26,23 +26,23 @@ def build_kmap_implicit_GEMM_hashmap_on_the_fly(
     coords = _coords.contiguous()
     if spatial_range is not None:
         coords_max_tuple = tuple(x - 1 for x in spatial_range)
-        coords_max = make_tensor(
-            coords_max_tuple, dtype=torch.int, device=coords.device
-        )
+        coords_max = make_tensor(coords_max_tuple,
+                                 dtype=torch.int,
+                                 device=coords.device)
     else:
         coords_max = coords.max(0).values
         if not subm:
-            coords_max[1:] = (
-                coords_max[1:] + 2 * padding - (kernel_size - 1)
-            ) // stride
+            coords_max[1:] = (coords_max[1:] + 2 * padding -
+                              (kernel_size - 1)) // stride
 
     if torchsparse.tensor.get_allow_negative_coordinates():
         coords_min = coords.min(0).values
         coords_min[1:] = torch.div(
-            coords_min[1:] - 2 * padding + (kernel_size - 1), stride
-        )
+            coords_min[1:] - 2 * padding + (kernel_size - 1), stride)
     else:
-        coords_min = make_tensor((0, 0, 0, 0), dtype=torch.int, device=coords.device)
+        coords_min = make_tensor((0, 0, 0, 0),
+                                 dtype=torch.int,
+                                 device=coords.device)
 
     if subm:
         func = torchsparse.backend.build_kernel_map_subm_hashmap
@@ -54,20 +54,18 @@ def build_kmap_implicit_GEMM_hashmap_on_the_fly(
         torchsparse.backends.hash_rsv_ratio >= 2
     ), f"hash_rsv_ratio should be no less than 2, now {torchsparse.backends.hash_rsv_ratio}."
     hashmap_capacity = max(
-        512, int(torchsparse.backends.hash_rsv_ratio * _coords.shape[0])
-    )
+        512, int(torchsparse.backends.hash_rsv_ratio * _coords.shape[0]))
     if kmap["hashmap_keys"] is None:
-        kmap["hashmap_keys"] = torch.zeros(
-            hashmap_capacity, dtype=torch.int64, device=coords.device
-        )
+        kmap["hashmap_keys"] = torch.zeros(hashmap_capacity,
+                                           dtype=torch.int64,
+                                           device=coords.device)
         to_insert = True
     if kmap["hashmap_vals"] is None:
-        kmap["hashmap_vals"] = torch.zeros(
-            hashmap_capacity, dtype=torch.int32, device=coords.device
-        )
-    hashtable = torchsparse.backend.GPUHashTable(
-        kmap["hashmap_keys"], kmap["hashmap_vals"]
-    )
+        kmap["hashmap_vals"] = torch.zeros(hashmap_capacity,
+                                           dtype=torch.int32,
+                                           device=coords.device)
+    hashtable = torchsparse.backend.GPUHashTable(kmap["hashmap_keys"],
+                                                 kmap["hashmap_vals"])
 
     out = func(
         hashtable,
@@ -91,16 +89,13 @@ def build_kmap_implicit_GEMM_hashmap_on_the_fly(
 
     if ifsort:
         bitmask = torchsparse.backend.derive_bitmask_from_out_in_map(
-            out_in_map, split_mask_num, kmap["sizes"][1]
-        )
+            out_in_map, split_mask_num, kmap["sizes"][1])
         sorted_mask, reorder_loc = torch.sort(bitmask, descending=True)
         reorder_loc = reorder_loc.to(torch.int32)
         reorder_out_in_map = torchsparse.backend.reorder_out_in_map_cuda(
-            out_in_map, reorder_loc
-        )
+            out_in_map, reorder_loc)
         reduced_sorted_mask = torchsparse.backend.reduce_bitmask_cuda(
-            sorted_mask, cta_M
-        )
+            sorted_mask, cta_M)
         kmap["reorder_out_in_map"] = reorder_out_in_map
         kmap["reduced_sorted_mask"] = reduced_sorted_mask
         kmap["reorder_loc"] = reorder_loc
@@ -138,14 +133,15 @@ def build_kmap_Gather_Scatter_hashmap_on_the_fly(
     results = torch.t(kmap["out_in_map"]).contiguous()
     nbsizes = torch.sum(results != -1, dim=1)
     nbmaps = torch.nonzero(results != -1)
-    nbmaps[:, 0] = results.view(-1)[nbmaps[:, 0] * results.size(1) + nbmaps[:, 1]]
+    nbmaps[:,
+           0] = results.view(-1)[nbmaps[:, 0] * results.size(1) + nbmaps[:, 1]]
     # important for build masks
     nbmaps = nbmaps.contiguous()
     input_mask, output_mask = torchsparse.backend.build_mask_from_kmap(
         _coords.shape[0],
         kmap["coords"].shape[0],
         nbmaps.int(),
-        nbsizes.int()[0 : kmap["coords"].shape[0]],
+        nbsizes.int()[0:kmap["coords"].shape[0]],
     )
 
     kmap["nbmaps"] = nbmaps
@@ -185,16 +181,20 @@ def build_kmap_Fetch_on_Demand_hashmap_on_the_fly(
     results = torch.t(kmap["out_in_map"]).contiguous()
     nbsizes = torch.sum(results != -1, dim=1).to(torch.int)
     nbmaps = torch.nonzero(results != -1)
-    nbmaps[:, 0] = results.view(-1)[nbmaps[:, 0] * results.size(1) + nbmaps[:, 1]]
+    nbmaps[:,
+           0] = results.view(-1)[nbmaps[:, 0] * results.size(1) + nbmaps[:, 1]]
 
     kernel_volume = nbsizes.size(0)
-    nbaddrs = torch.zeros((kernel_volume + 1), dtype=torch.int, device=nbmaps.device)
-    qnbaddrs = torch.zeros((kernel_volume + 1), dtype=torch.int, device=nbmaps.device)
+    nbaddrs = torch.zeros((kernel_volume + 1),
+                          dtype=torch.int,
+                          device=nbmaps.device)
+    qnbaddrs = torch.zeros((kernel_volume + 1),
+                           dtype=torch.int,
+                           device=nbmaps.device)
 
     # Derive quantified arrays
     torchsparse.backend.exclusive_scan_quantified_wrapper(
-        kernel_volume, nbsizes, nbaddrs, qnbaddrs
-    )
+        kernel_volume, nbsizes, nbaddrs, qnbaddrs)
 
     # nbmaps need to be transposed for Fetch-on-Demand
     kmap["nbmaps"] = nbmaps.transpose(0, 1).int()

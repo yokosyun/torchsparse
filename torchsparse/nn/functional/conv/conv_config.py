@@ -12,19 +12,17 @@ class Dataflow(Enum):
 
 
 _global_conv_config = None
-_default_conv_config = AttributeDict(
-    [
-        ("dataflow", Dataflow.ImplicitGEMM),
-        ("ifsort", False),
-        ("kmap_mode", "hashmap_on_the_fly"),
-        ("downsample_mode", "spconv"),
-        ("split_mask_num", 1),
-        ("split_mask_num_bwd", 3),
-        ("epsilon", 0.0),
-        ("mm_thresh", 0),
-        ("FOD_fusion", True),
-    ]
-)
+_default_conv_config = AttributeDict([
+    ("dataflow", Dataflow.ImplicitGEMM),
+    ("ifsort", False),
+    ("kmap_mode", "hashmap_on_the_fly"),
+    ("downsample_mode", "spconv"),
+    ("split_mask_num", 1),
+    ("split_mask_num_bwd", 3),
+    ("epsilon", 0.0),
+    ("mm_thresh", 0),
+    ("FOD_fusion", True),
+])
 
 
 def keys_check(conv_config):
@@ -46,7 +44,8 @@ def keys_check(conv_config):
         conv_config["split_mask_num"] = _default_conv_config["split_mask_num"]
     if "split_mask_num_bwd" not in conv_config:
         flag = True
-        conv_config["split_mask_num_bwd"] = _default_conv_config["split_mask_num_bwd"]
+        conv_config["split_mask_num_bwd"] = _default_conv_config[
+            "split_mask_num_bwd"]
     if "epsilon" not in conv_config:
         flag = True
         conv_config["epsilon"] = _default_conv_config["epsilon"]
@@ -78,9 +77,8 @@ def clear_global_conv_config():
     _global_conv_config = None
 
 
-def get_default_conv_config(
-    conv_mode: ConvMode = ConvMode.mode0, training: bool = False
-):
+def get_default_conv_config(conv_mode: ConvMode = ConvMode.mode0,
+                            training: bool = False):
     config = _default_conv_config
     # if training:
     #     config.ifsort = True

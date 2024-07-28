@@ -23,9 +23,8 @@ version_file = open("./torchsparse/version.py")
 version = version_file.read().split("'")[1]
 print("torchsparse version:", version)
 
-if (torch.cuda.is_available() and CUDA_HOME is not None) or (
-    os.getenv("FORCE_CUDA", "0") == "1"
-):
+if (torch.cuda.is_available() and CUDA_HOME is not None) or (os.getenv(
+        "FORCE_CUDA", "0") == "1"):
     device = "cuda"
     pybind_fn = f"pybind_{device}.cu"
 else:
@@ -34,9 +33,9 @@ else:
 
 sources = [os.path.join("torchsparse", "backend", pybind_fn)]
 for fpath in glob.glob(os.path.join("torchsparse", "backend", "**", "*")):
-    if (fpath.endswith("_cpu.cpp") and device in ["cpu", "cuda"]) or (
-        fpath.endswith("_cuda.cu") and device == "cuda"
-    ):
+    if (fpath.endswith("_cpu.cpp")
+            and device in ["cpu", "cuda"]) or (fpath.endswith("_cuda.cu")
+                                               and device == "cuda"):
         sources.append(fpath)
 
 pyx_files = []
@@ -46,7 +45,8 @@ for root, dirnames, filenames in os.walk("torchsparse"):
         if file_path.endswith(".py"):
             file_path2 = file_path + "x"
             os.system("mv " + file_path + " " + file_path2)
-            os.system("sed -i '1s/^/# cython: language_level=3\\n/' " + file_path2)
+            os.system("sed -i '1s/^/# cython: language_level=3\\n/' "
+                      + file_path2)
             pyx_files.append(file_path2)
 
 if pyx_files == []:
@@ -66,14 +66,11 @@ setup(
     name="torchsparse",
     version=version,
     packages=find_packages(),
-    ext_modules=cythonize(
-        [
-            extension_type(
-                "torchsparse.backend", sources, extra_compile_args=extra_compile_args
-            ),
-        ]
-        + pyx_files
-    ),
+    ext_modules=cythonize([
+        extension_type("torchsparse.backend",
+                       sources,
+                       extra_compile_args=extra_compile_args),
+    ] + pyx_files),
     install_requires=[
         "numpy",
         "backports.cached_property",

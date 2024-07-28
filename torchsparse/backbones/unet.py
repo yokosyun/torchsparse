@@ -12,6 +12,7 @@ __all__ = ["SparseResUNet42"]
 
 
 class SparseResUNet(nn.Module):
+
     def __init__(
         self,
         stem_channels: int,
@@ -56,21 +57,21 @@ class SparseResUNet(nn.Module):
                     ),
                     SparseResBlock(num_channels[k], num_channels[k + 1], 3),
                     SparseResBlock(num_channels[k + 1], num_channels[k + 1], 3),
-                )
-            )
+                ))
 
         self.decoders = nn.ModuleList()
         for k in range(4):
             self.decoders.append(
-                nn.ModuleDict(
-                    {
-                        "upsample": SparseConvTransposeBlock(
+                nn.ModuleDict({
+                    "upsample":
+                        SparseConvTransposeBlock(
                             num_channels[k + 4],
                             num_channels[k + 5],
                             2,
                             stride=2,
                         ),
-                        "fuse": nn.Sequential(
+                    "fuse":
+                        nn.Sequential(
                             SparseResBlock(
                                 num_channels[k + 5] + num_channels[3 - k],
                                 num_channels[k + 5],
@@ -82,9 +83,7 @@ class SparseResUNet(nn.Module):
                                 3,
                             ),
                         ),
-                    }
-                )
-            )
+                }))
 
     def _unet_forward(
         self,
@@ -113,6 +112,7 @@ class SparseResUNet(nn.Module):
 
 
 class SparseResUNet42(SparseResUNet):
+
     def __init__(self, **kwargs) -> None:
         super().__init__(
             stem_channels=32,

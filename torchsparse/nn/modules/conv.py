@@ -20,6 +20,7 @@ __all__ = ["Conv3d"]
 
 
 class Conv3d(nn.Module):
+
     def __init__(
         self,
         in_channels: int,
@@ -54,14 +55,10 @@ class Conv3d(nn.Module):
         self._config = config
 
         self.kernel_volume = int(np.prod(self.kernel_size))
-        if (
-            self.kernel_volume > 1
-            or self.kernel_volume == 1
-            and self.stride != (1, 1, 1)
-        ):
+        if (self.kernel_volume > 1 or self.kernel_volume == 1 and self.stride !=
+            (1, 1, 1)):
             self.kernel = nn.Parameter(
-                torch.zeros(self.kernel_volume, in_channels, out_channels)
-            )
+                torch.zeros(self.kernel_volume, in_channels, out_channels))
         else:
             self.kernel = nn.Parameter(torch.zeros(in_channels, out_channels))
         if bias:
@@ -87,8 +84,7 @@ class Conv3d(nn.Module):
     def reset_parameters(self) -> None:
         std = 1 / math.sqrt(
             (self.out_channels if self.transposed else self.in_channels)
-            * self.kernel_volume
-        )
+            * self.kernel_volume)
         self.kernel.data.uniform_(-std, std)
         if self.bias is not None:
             self.bias.data.uniform_(-std, std)

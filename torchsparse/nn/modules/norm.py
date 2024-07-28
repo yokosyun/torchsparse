@@ -8,16 +8,19 @@ __all__ = ["BatchNorm", "GroupNorm", "InstanceNorm"]
 
 
 class InstanceNorm(nn.InstanceNorm1d):
+
     def forward(self, input: SparseTensor) -> SparseTensor:
         return fapply(input, super().forward)
 
 
 class BatchNorm(nn.BatchNorm1d):
+
     def forward(self, input: SparseTensor) -> SparseTensor:
         return fapply(input, super().forward)
 
 
 class GroupNorm(nn.GroupNorm):
+
     def forward(self, input: SparseTensor) -> SparseTensor:
         coords, feats, stride = input.coords, input.feats, input.stride
 

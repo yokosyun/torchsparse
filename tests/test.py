@@ -7,6 +7,7 @@ from python import (
 
 
 class SparseConvTestCase(unittest.TestCase):
+
     def test_single_layer(self):
         kernel_sizes = [2, 3, 5]
         strides = [1, 2, 3]
@@ -18,8 +19,7 @@ class SparseConvTestCase(unittest.TestCase):
         for kernel_size in kernel_sizes:
             for stride in strides:
                 mean_adiff, max_rdiff = test_single_layer_convolution_forward(
-                    kernel_size=kernel_size, stride=stride
-                )
+                    kernel_size=kernel_size, stride=stride)
                 acc_adiff += mean_adiff
                 acc_rdiff += max_rdiff
                 count += 1
@@ -31,8 +31,7 @@ class SparseConvTestCase(unittest.TestCase):
         for kernel_size in kernel_sizes:
             for stride in strides:
                 mean_adiff, max_rdiff = test_single_layer_convolution_forward(
-                    kernel_size=kernel_size, stride=stride
-                )
+                    kernel_size=kernel_size, stride=stride)
                 acc_adiff += mean_adiff
                 acc_rdiff += max_rdiff
                 count += 1
@@ -42,6 +41,7 @@ class SparseConvTestCase(unittest.TestCase):
 
 
 class ToDenseTestCase(unittest.TestCase):
+
     def test_to_dense(self):
         max_adiff = test_to_dense_forward()
         self.assertLessEqual(max_adiff, 1e-5)

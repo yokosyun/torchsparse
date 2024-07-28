@@ -11,6 +11,7 @@ __all__ = ["to_dense"]
 
 
 class ToDenseFunction(Function):
+
     @staticmethod
     # @custom_fwd(cast_inputs=torch.half)
     def forward(
@@ -21,15 +22,16 @@ class ToDenseFunction(Function):
     ) -> torch.Tensor:
         feats = feats.contiguous()
         coords = coords.contiguous().int()
-        outputs = torch.zeros(
-            spatial_range + (feats.size(1),), dtype=feats.dtype, device=feats.device
-        )
-        spatial_range = make_tensor(spatial_range, dtype=torch.int, device=feats.device)
+        outputs = torch.zeros(spatial_range + (feats.size(1),),
+                              dtype=feats.dtype,
+                              device=feats.device)
+        spatial_range = make_tensor(spatial_range,
+                                    dtype=torch.int,
+                                    device=feats.device)
 
         if feats.device.type == "cuda":
-            torchsparse.backend.to_dense_forward_cuda(
-                feats, coords, spatial_range, outputs
-            )
+            torchsparse.backend.to_dense_forward_cuda(feats, coords,
+                                                      spatial_range, outputs)
         else:
             raise NotImplementedError
 
@@ -49,16 +51,15 @@ class ToDenseFunction(Function):
         )
 
         if grad_output.device.type == "cuda":
-            torchsparse.backend.to_dense_backward_cuda(
-                grad_output, coords, spatial_range, grad_feats
-            )
+            torchsparse.backend.to_dense_backward_cuda(grad_output, coords,
+                                                       spatial_range,
+                                                       grad_feats)
         else:
             raise NotImplementedError
 
         return grad_feats, None, None
 
 
-def to_dense(
-    feats: torch.Tensor, coords: torch.Tensor, spatial_range: Tuple[int]
-) -> torch.Tensor:
+def to_dense(feats: torch.Tensor, coords: torch.Tensor,
+             spatial_range: Tuple[int]) -> torch.Tensor:
     return ToDenseFunction.apply(feats, coords, spatial_range)

@@ -27,6 +27,7 @@ def set_allow_negative_coordinates(allow_negative_coordinates):
 
 
 class SparseTensor:
+
     def __init__(
         self,
         feats: torch.Tensor,
@@ -40,7 +41,8 @@ class SparseTensor:
         if spatial_range is None:
             self.spatial_range = None
         else:
-            self.spatial_range = make_ntuple(spatial_range, ndim=len(spatial_range))
+            self.spatial_range = make_ntuple(spatial_range,
+                                             ndim=len(spatial_range))
 
         if get_tensor_cache_mode() == TensorCacheMode.GLOBAL_TENSOR_CACHE:
             _caches = get_global_tensor_cache()

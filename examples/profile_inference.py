@@ -7,14 +7,12 @@ import torch.cuda
 import torch.nn as nn
 import torch.optim
 
-
 NUM_PC_CHANNELS = 4
 VOXEL_SIZE = 1.0
 MAX_X = 200
 MAX_Y = 200
 MAX_Z = 4
 NUM_PC = MAX_X * MAX_Y * MAX_Z
-
 
 from torchsparse import SparseTensor
 from torchsparse.utils.collate import sparse_collate_fn
@@ -44,7 +42,11 @@ def generate_random_point_cloud(size=100000, voxel_size=0.2):
         input = SparseTensor(coords=coords, feats=feats)
         label = SparseTensor(coords=coords, feats=labels)
     else:
-        feats = torch.zeros(NUM_PC_CHANNELS, MAX_X, MAX_Y, MAX_Z, dtype=torch.float)
+        feats = torch.zeros(NUM_PC_CHANNELS,
+                            MAX_X,
+                            MAX_Y,
+                            MAX_Z,
+                            dtype=torch.float)
         labels = torch.zeros(MAX_X, MAX_Y, MAX_Z, dtype=torch.long)
         input = feats
         label = labels
@@ -54,7 +56,9 @@ def generate_random_point_cloud(size=100000, voxel_size=0.2):
     return feed_dict
 
 
-def generate_batched_random_point_clouds(size=100000, voxel_size=0.2, batch_size=2):
+def generate_batched_random_point_clouds(size=100000,
+                                         voxel_size=0.2,
+                                         batch_size=2):
     batch = []
     for _ in range(batch_size):
         batch.append(generate_random_point_cloud(size, voxel_size))
@@ -77,7 +81,8 @@ def dummy_train_3x3(device):
     print("Starting dummy_train_3x3...")
     time = datetime.now()
 
-    feed_dict = generate_batched_random_point_clouds(size=NUM_PC, voxel_size=VOXEL_SIZE)
+    feed_dict = generate_batched_random_point_clouds(size=NUM_PC,
+                                                     voxel_size=VOXEL_SIZE)
     with profiler.profile(profile_memory=True, use_cuda=True) as prof:
         with profiler.record_function("model_inference"):
             for _ in range(10):

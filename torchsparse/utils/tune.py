@@ -19,6 +19,7 @@ __all__ = ["tune"]
 
 
 class StableTimeAccumulator:
+
     def __init__(self):
         self.fwd_trial = 0
         self.ave_fwd_time = 0.0
@@ -32,9 +33,8 @@ class StableTimeAccumulator:
                 self.fwd_trial += 1
             else:
                 if cur_fwd_time <= 5 * self.ave_fwd_time:
-                    self.ave_fwd_time = (
-                        (self.fwd_trial * self.ave_fwd_time) + cur_fwd_time
-                    ) / (self.fwd_trial + 1)
+                    self.ave_fwd_time = ((self.fwd_trial * self.ave_fwd_time)
+                                         + cur_fwd_time) / (self.fwd_trial + 1)
                     self.fwd_trial += 1
         if cur_bwd_time > 0:
             if self.bwd_trial == 0:
@@ -42,9 +42,8 @@ class StableTimeAccumulator:
                 self.bwd_trial += 1
             else:
                 if cur_bwd_time <= 5 * self.ave_bwd_time:
-                    self.ave_bwd_time = (
-                        (self.bwd_trial * self.ave_bwd_time) + cur_bwd_time
-                    ) / (self.bwd_trial + 1)
+                    self.ave_bwd_time = ((self.bwd_trial * self.ave_bwd_time)
+                                         + cur_bwd_time) / (self.bwd_trial + 1)
                     self.bwd_trial += 1
 
     def get_total_time(self):
@@ -115,9 +114,9 @@ def dataflow_selector(
     inputs: SparseTensor,
     dataflow_range: List,
     group_to_name: DefaultDict[Tuple[Any, ...], List],
-    dataflow_all: DefaultDict[
-        Tuple[Any, ...], DefaultDict[Tuple[Any, ...], StableTimeAccumulator]
-    ],
+    dataflow_all: DefaultDict[Tuple[Any, ...],
+                              DefaultDict[Tuple[Any, ...],
+                                          StableTimeAccumulator]],
     tune_with_bwd: bool,
 ) -> None:
 
@@ -137,11 +136,9 @@ def dataflow_selector(
             set_group_config(model, names, dummy_config)
             inputs = clear_tensor_cache(inputs)
             fwd_duration, bwd_duration = torchsparse_tune_timer(
-                model, inputs, tune_with_bwd
-            )
+                model, inputs, tune_with_bwd)
             dataflow_all[group_idx][(dummy_config.dataflow)].stable_add(
-                fwd_duration, bwd_duration
-            )
+                fwd_duration, bwd_duration)
 
             # Setting 2: ImplicitGEMM-sort(split=3)
             dummy_config.dataflow, dummy_config.ifsort, dummy_config.split_mask_num = (
@@ -152,11 +149,9 @@ def dataflow_selector(
             set_group_config(model, names, dummy_config)
             inputs = clear_tensor_cache(inputs)
             fwd_duration, bwd_duration = torchsparse_tune_timer(
-                model, inputs, tune_with_bwd
-            )
+                model, inputs, tune_with_bwd)
             dataflow_all[group_idx][(dummy_config.dataflow)].stable_add(
-                fwd_duration, bwd_duration
-            )
+                fwd_duration, bwd_duration)
 
         # Dataflow 2: Fetch-On-Demand
         if F.Dataflow.FetchOnDemand in dataflow_range:
@@ -168,11 +163,9 @@ def dataflow_selector(
             set_group_config(model, names, dummy_config)
             inputs = clear_tensor_cache(inputs)
             fwd_duration, bwd_duration = torchsparse_tune_timer(
-                model, inputs, tune_with_bwd
-            )
+                model, inputs, tune_with_bwd)
             dataflow_all[group_idx][(dummy_config.dataflow)].stable_add(
-                fwd_duration, bwd_duration
-            )
+                fwd_duration, bwd_duration)
 
         # Dataflow 3: Gather-Scatter (Deprecated by default)
         if F.Dataflow.GatherScatter in dataflow_range:
@@ -184,11 +177,9 @@ def dataflow_selector(
             set_group_config(model, names, dummy_config)
             inputs = clear_tensor_cache(inputs)
             fwd_duration, bwd_duration = torchsparse_tune_timer(
-                model, inputs, tune_with_bwd
-            )
+                model, inputs, tune_with_bwd)
             dataflow_all[group_idx][(dummy_config.dataflow)].stable_add(
-                fwd_duration, bwd_duration
-            )
+                fwd_duration, bwd_duration)
 
 
 # @torch.no_grad()
@@ -198,9 +189,9 @@ def profile_model(
     dataflow_range: List,
     dataflow_prune: bool,
     group_to_name: DefaultDict[Tuple[Any, ...], List],
-    configs_all: DefaultDict[
-        Tuple[Any, ...], DefaultDict[Tuple[Any, ...], StableTimeAccumulator]
-    ],
+    configs_all: DefaultDict[Tuple[Any, ...],
+                             DefaultDict[Tuple[Any, ...],
+                                         StableTimeAccumulator]],
     group_dataflow: Dict,
     tune_with_bwd: bool,
 ) -> None:
@@ -225,10 +216,24 @@ def profile_model(
                 set_group_config(model, names, dummy_config)
                 inputs = clear_tensor_cache(inputs)
                 fwd_duration, bwd_duration = torchsparse_tune_timer(
-                    model, inputs, tune_with_bwd
-                )
-                configs_all[group_idx][
-                    (
+                    model, inputs, tune_with_bwd)
+                configs_all[group_idx][(
+                    dummy_config.epsilon,
+                    dummy_config.mm_thresh,
+                    dummy_config.split_mask_num,
+                    dummy_config.split_mask_num_bwd,
+                    dummy_config.dataflow,
+                    dummy_config.ifsort,
+                    dummy_config.FOD_fusion,
+                )].stable_add(fwd_duration, bwd_duration)
+            else:
+                for split_mask_num_bwd in range(1, 5):
+                    dummy_config.split_mask_num_bwd = split_mask_num_bwd
+                    set_group_config(model, names, dummy_config)
+                    inputs = clear_tensor_cache(inputs)
+                    fwd_duration, bwd_duration = torchsparse_tune_timer(
+                        model, inputs, tune_with_bwd)
+                    configs_all[group_idx][(
                         dummy_config.epsilon,
                         dummy_config.mm_thresh,
                         dummy_config.split_mask_num,
@@ -236,27 +241,7 @@ def profile_model(
                         dummy_config.dataflow,
                         dummy_config.ifsort,
                         dummy_config.FOD_fusion,
-                    )
-                ].stable_add(fwd_duration, bwd_duration)
-            else:
-                for split_mask_num_bwd in range(1, 5):
-                    dummy_config.split_mask_num_bwd = split_mask_num_bwd
-                    set_group_config(model, names, dummy_config)
-                    inputs = clear_tensor_cache(inputs)
-                    fwd_duration, bwd_duration = torchsparse_tune_timer(
-                        model, inputs, tune_with_bwd
-                    )
-                    configs_all[group_idx][
-                        (
-                            dummy_config.epsilon,
-                            dummy_config.mm_thresh,
-                            dummy_config.split_mask_num,
-                            dummy_config.split_mask_num_bwd,
-                            dummy_config.dataflow,
-                            dummy_config.ifsort,
-                            dummy_config.FOD_fusion,
-                        )
-                    ].stable_add(fwd_duration, bwd_duration)
+                    )].stable_add(fwd_duration, bwd_duration)
 
             # Stage 2: test sort fwd
             dummy_config.ifsort = True
@@ -266,19 +251,16 @@ def profile_model(
                     set_group_config(model, names, dummy_config)
                     inputs = clear_tensor_cache(inputs)
                     fwd_duration, bwd_duration = torchsparse_tune_timer(
-                        model, inputs, tune_with_bwd
-                    )
-                    configs_all[group_idx][
-                        (
-                            dummy_config.epsilon,
-                            dummy_config.mm_thresh,
-                            dummy_config.split_mask_num,
-                            dummy_config.split_mask_num_bwd,
-                            dummy_config.dataflow,
-                            dummy_config.ifsort,
-                            dummy_config.FOD_fusion,
-                        )
-                    ].stable_add(fwd_duration, bwd_duration)
+                        model, inputs, tune_with_bwd)
+                    configs_all[group_idx][(
+                        dummy_config.epsilon,
+                        dummy_config.mm_thresh,
+                        dummy_config.split_mask_num,
+                        dummy_config.split_mask_num_bwd,
+                        dummy_config.dataflow,
+                        dummy_config.ifsort,
+                        dummy_config.FOD_fusion,
+                    )].stable_add(fwd_duration, bwd_duration)
             else:
                 for split_mask_num in range(1, 5):
                     dummy_config.split_mask_num = split_mask_num
@@ -286,31 +268,26 @@ def profile_model(
                     set_group_config(model, names, dummy_config)
                     inputs = clear_tensor_cache(inputs)
                     fwd_duration, bwd_duration = torchsparse_tune_timer(
-                        model, inputs, tune_with_bwd
-                    )
+                        model, inputs, tune_with_bwd)
                     for iter in range(1, 5):
-                        configs_all[group_idx][
-                            (
-                                dummy_config.epsilon,
-                                dummy_config.mm_thresh,
-                                dummy_config.split_mask_num,
-                                iter,
-                                dummy_config.dataflow,
-                                dummy_config.ifsort,
-                                dummy_config.FOD_fusion,
-                            )
-                        ].stable_add(fwd_duration, 0.0)
-                        configs_all[group_idx][
-                            (
-                                dummy_config.epsilon,
-                                dummy_config.mm_thresh,
-                                iter,
-                                dummy_config.split_mask_num_bwd,
-                                dummy_config.dataflow,
-                                dummy_config.ifsort,
-                                dummy_config.FOD_fusion,
-                            )
-                        ].stable_add(0.0, bwd_duration)
+                        configs_all[group_idx][(
+                            dummy_config.epsilon,
+                            dummy_config.mm_thresh,
+                            dummy_config.split_mask_num,
+                            iter,
+                            dummy_config.dataflow,
+                            dummy_config.ifsort,
+                            dummy_config.FOD_fusion,
+                        )].stable_add(fwd_duration, 0.0)
+                        configs_all[group_idx][(
+                            dummy_config.epsilon,
+                            dummy_config.mm_thresh,
+                            iter,
+                            dummy_config.split_mask_num_bwd,
+                            dummy_config.dataflow,
+                            dummy_config.ifsort,
+                            dummy_config.FOD_fusion,
+                        )].stable_add(0.0, bwd_duration)
 
         if F.Dataflow.FetchOnDemand in local_dataflow_range:
             # Fetch-on-Demand. Tune whether to fuse.
@@ -320,10 +297,39 @@ def profile_model(
                 set_group_config(model, names, dummy_config)
                 inputs = clear_tensor_cache(inputs)
                 fwd_duration, bwd_duration = torchsparse_tune_timer(
-                    model, inputs, tune_with_bwd
-                )
-                configs_all[group_idx][
-                    (
+                    model, inputs, tune_with_bwd)
+                configs_all[group_idx][(
+                    dummy_config.epsilon,
+                    dummy_config.mm_thresh,
+                    dummy_config.split_mask_num,
+                    dummy_config.split_mask_num_bwd,
+                    dummy_config.dataflow,
+                    dummy_config.ifsort,
+                    dummy_config.FOD_fusion,
+                )].stable_add(fwd_duration, bwd_duration)
+
+        if F.Dataflow.GatherScatter in local_dataflow_range:
+            # Gather-Scatter. Tune eps & mm_thresh
+            dummy_config.dataflow = F.Dataflow.GatherScatter
+            for epsilon in np.arange(0.0, 0.6, 0.1):
+                for mm_thresh in [
+                        0,
+                        5000,
+                        7500,
+                        10000,
+                        12500,
+                        15000,
+                        17500,
+                        20000,
+                        22500,
+                        25000,
+                ]:
+                    dummy_config.epsilon, dummy_config.mm_thresh = epsilon, mm_thresh
+                    set_group_config(model, names, dummy_config)
+                    inputs = clear_tensor_cache(inputs)
+                    fwd_duration, bwd_duration = torchsparse_tune_timer(
+                        model, inputs, tune_with_bwd)
+                    configs_all[group_idx][(
                         dummy_config.epsilon,
                         dummy_config.mm_thresh,
                         dummy_config.split_mask_num,
@@ -331,42 +337,7 @@ def profile_model(
                         dummy_config.dataflow,
                         dummy_config.ifsort,
                         dummy_config.FOD_fusion,
-                    )
-                ].stable_add(fwd_duration, bwd_duration)
-
-        if F.Dataflow.GatherScatter in local_dataflow_range:
-            # Gather-Scatter. Tune eps & mm_thresh
-            dummy_config.dataflow = F.Dataflow.GatherScatter
-            for epsilon in np.arange(0.0, 0.6, 0.1):
-                for mm_thresh in [
-                    0,
-                    5000,
-                    7500,
-                    10000,
-                    12500,
-                    15000,
-                    17500,
-                    20000,
-                    22500,
-                    25000,
-                ]:
-                    dummy_config.epsilon, dummy_config.mm_thresh = epsilon, mm_thresh
-                    set_group_config(model, names, dummy_config)
-                    inputs = clear_tensor_cache(inputs)
-                    fwd_duration, bwd_duration = torchsparse_tune_timer(
-                        model, inputs, tune_with_bwd
-                    )
-                    configs_all[group_idx][
-                        (
-                            dummy_config.epsilon,
-                            dummy_config.mm_thresh,
-                            dummy_config.split_mask_num,
-                            dummy_config.split_mask_num_bwd,
-                            dummy_config.dataflow,
-                            dummy_config.ifsort,
-                            dummy_config.FOD_fusion,
-                        )
-                    ].stable_add(fwd_duration, bwd_duration)
+                    )].stable_add(fwd_duration, bwd_duration)
 
 
 # @torch.no_grad()
@@ -398,22 +369,24 @@ def tune(
     # An iterator can only be used once, so use with care.
     if isinstance(data_loader, Iterator):
         if not skip_warning:
-            print(f"Warning: data_loader is an iterator of type {type(data_loader)}.")
+            print(
+                f"Warning: data_loader is an iterator of type {type(data_loader)}."
+            )
             print("Take caution if data_loader is shared with other functions.")
     if not torchsparse.backends.benchmark:  # type: ignore
         if not skip_warning:
             print(
-                "Warning: to use tuning, "
-                + "torchsparse.backends.benchmark is automatically set to be true."
+                "Warning: to use tuning, " +
+                "torchsparse.backends.benchmark is automatically set to be true."
             )
         torchsparse.backends.benchmark = True  # type: ignore
 
-    dataflow_all: DefaultDict[
-        Tuple[Any, ...], DefaultDict[Tuple[Any, ...], StableTimeAccumulator]
-    ] = defaultdict(lambda: defaultdict(StableTimeAccumulator))
-    configs_all: DefaultDict[
-        Tuple[Any, ...], DefaultDict[Tuple[Any, ...], StableTimeAccumulator]
-    ] = defaultdict(lambda: defaultdict(StableTimeAccumulator))
+    dataflow_all: DefaultDict[Tuple[Any, ...], DefaultDict[Tuple[
+        Any, ...], StableTimeAccumulator]] = defaultdict(
+            lambda: defaultdict(StableTimeAccumulator))
+    configs_all: DefaultDict[Tuple[Any, ...], DefaultDict[Tuple[
+        Any, ...], StableTimeAccumulator]] = defaultdict(
+            lambda: defaultdict(StableTimeAccumulator))
     name_to_group: DefaultDict[str, Tuple[Any, ...]] = {}
     group_to_name = defaultdict(list)
     device_id = int(str(next(model.parameters()).device).split(":")[-1])
@@ -424,11 +397,11 @@ def tune(
         if not module.transposed:
             tensor_stride = inputs[0].stride
         else:
-            tensor_stride = tuple(
-                inputs[0].stride[k] // make_ntuple(module.stride, ndim=3)[k]
-                for k in range(3)
-            )
-        group_idx = (tensor_stride, module.kernel_size, module.stride, module.dilation)
+            tensor_stride = tuple(inputs[0].stride[k]
+                                  // make_ntuple(module.stride, ndim=3)[k]
+                                  for k in range(3))
+        group_idx = (tensor_stride, module.kernel_size, module.stride,
+                     module.dilation)
         name_to_group[name] = group_idx
         group_to_name[group_idx].append(name)
 
@@ -437,7 +410,8 @@ def tune(
     if (os.path.exists(os.path.join(save_dir, tune_tag))) and not force_retune:
         if verbose:
             print("Load existing tuned group configs")
-        name_to_group, group_configs = torch.load(os.path.join(save_dir, tune_tag))
+        name_to_group, group_configs = torch.load(
+            os.path.join(save_dir, tune_tag))
     else:
         handler_collection = []
         for name, module in model.named_modules():
@@ -445,19 +419,17 @@ def tune(
             if isinstance(module, Conv3d):
                 if len(module.kernel.data.shape) == 3:
                     _handler = module.register_forward_hook(
-                        functools.partial(dump, name=name)
-                    )
+                        functools.partial(dump, name=name))
                     handler_collection.append(_handler)
 
         # Stage 0: Dump the model structure
         for i, feed_dict in enumerate(
-            tqdm(
-                data_loader,
-                desc="Dump the model structure",
-                leave=False,
-                total=n_samples,
-            )
-        ):
+                tqdm(
+                    data_loader,
+                    desc="Dump the model structure",
+                    leave=False,
+                    total=n_samples,
+                )):
             inputs = collect_fn(feed_dict)
             if enable_fp16:
                 inputs = recursive_apply(inputs, lambda x: x.half())
@@ -485,13 +457,12 @@ def tune(
             else:
                 count = 0
                 for i, feed_dict in enumerate(
-                    tqdm(
-                        data_loader,
-                        desc="Select best dataflow for each group",
-                        leave=False,
-                        total=n_samples,
-                    )
-                ):
+                        tqdm(
+                            data_loader,
+                            desc="Select best dataflow for each group",
+                            leave=False,
+                            total=n_samples,
+                        )):
                     inputs = collect_fn(feed_dict)
                     if enable_fp16:
                         inputs = recursive_apply(inputs, lambda x: x.half())
@@ -519,27 +490,22 @@ def tune(
                 for group_idx in dataflow_all:
                     time_min = -1.0
                     for dataflow in dataflow_all[group_idx]:
-                        if (
-                            time_min < 0
-                            or time_min
-                            > dataflow_all[group_idx][(dataflow)].get_total_time()
-                        ):
-                            time_min = dataflow_all[group_idx][
-                                (dataflow)
-                            ].get_total_time()
+                        if (time_min < 0 or time_min > dataflow_all[group_idx][
+                            (dataflow)].get_total_time()):
+                            time_min = dataflow_all[group_idx][(
+                                dataflow)].get_total_time()
                             dataflow_best = dataflow
                     group_dataflow[group_idx] = {"dataflow": dataflow_best}
 
         # Stage 2: Tune best configs for each group
         count = 0
         for i, feed_dict in enumerate(
-            tqdm(
-                data_loader,
-                desc="Tuning best group configs",
-                leave=False,
-                total=n_samples,
-            )
-        ):
+                tqdm(
+                    data_loader,
+                    desc="Tuning best group configs",
+                    leave=False,
+                    total=n_samples,
+                )):
             inputs = collect_fn(feed_dict)
             if enable_fp16:
                 inputs = recursive_apply(inputs, lambda x: x.half())
@@ -569,40 +535,32 @@ def tune(
         for group_idx in configs_all:
             time_min = -1.0
             for (
-                ep,
-                thresh,
-                split_mask_num,
-                split_mask_num_bwd,
-                dataflow,
-                ifsort,
-                FOD_fusion,
+                    ep,
+                    thresh,
+                    split_mask_num,
+                    split_mask_num_bwd,
+                    dataflow,
+                    ifsort,
+                    FOD_fusion,
             ) in configs_all[group_idx]:
-                if (
-                    time_min < 0
-                    or time_min
-                    > configs_all[group_idx][
-                        (
-                            ep,
-                            thresh,
-                            split_mask_num,
-                            split_mask_num_bwd,
-                            dataflow,
-                            ifsort,
-                            FOD_fusion,
-                        )
-                    ].get_total_time()
-                ):
-                    time_min = configs_all[group_idx][
-                        (
-                            ep,
-                            thresh,
-                            split_mask_num,
-                            split_mask_num_bwd,
-                            dataflow,
-                            ifsort,
-                            FOD_fusion,
-                        )
-                    ].get_total_time()
+                if (time_min < 0 or time_min > configs_all[group_idx][(
+                        ep,
+                        thresh,
+                        split_mask_num,
+                        split_mask_num_bwd,
+                        dataflow,
+                        ifsort,
+                        FOD_fusion,
+                )].get_total_time()):
+                    time_min = configs_all[group_idx][(
+                        ep,
+                        thresh,
+                        split_mask_num,
+                        split_mask_num_bwd,
+                        dataflow,
+                        ifsort,
+                        FOD_fusion,
+                    )].get_total_time()
                     ep_best = ep
                     thresh_best = thresh
                     split_mask_num_best = split_mask_num
@@ -623,9 +581,11 @@ def tune(
         # save tuned group configs
         if device_id == 0:
             if verbose:
-                print("Save tuned group configs to", os.path.join(save_dir, tune_tag))
+                print("Save tuned group configs to",
+                      os.path.join(save_dir, tune_tag))
             os.makedirs(save_dir, exist_ok=True)
-            torch.save((name_to_group, group_configs), os.path.join(save_dir, tune_tag))
+            torch.save((name_to_group, group_configs),
+                       os.path.join(save_dir, tune_tag))
 
     # modify the model
     for name, module in model.named_modules():
@@ -639,16 +599,19 @@ def tune(
                         if glb_config is not None:
                             new_config = glb_config.copy()
                         else:
-                            new_config = F.conv_config.get_default_conv_config().copy()
-                    new_config.dataflow = group_configs[layer_group_idx]["dataflow"]
-                    new_config.epsilon = group_configs[layer_group_idx]["epsilon"]
-                    new_config.mm_thresh = group_configs[layer_group_idx]["mm_thresh"]
+                            new_config = F.conv_config.get_default_conv_config(
+                            ).copy()
+                    new_config.dataflow = group_configs[layer_group_idx][
+                        "dataflow"]
+                    new_config.epsilon = group_configs[layer_group_idx][
+                        "epsilon"]
+                    new_config.mm_thresh = group_configs[layer_group_idx][
+                        "mm_thresh"]
                     new_config.ifsort = group_configs[layer_group_idx]["ifsort"]
                     new_config.split_mask_num = group_configs[layer_group_idx][
-                        "split_mask_num"
-                    ]
-                    new_config.split_mask_num_bwd = group_configs[layer_group_idx][
-                        "split_mask_num_bwd"
-                    ]
-                    new_config.FOD_fusion = group_configs[layer_group_idx]["FOD_fusion"]
+                        "split_mask_num"]
+                    new_config.split_mask_num_bwd = group_configs[
+                        layer_group_idx]["split_mask_num_bwd"]
+                    new_config.FOD_fusion = group_configs[layer_group_idx][
+                        "FOD_fusion"]
                     module._config = new_config.copy()

@@ -14,6 +14,7 @@ __all__ = ["GatherScatterConvolutionFuntion"]
 
 
 class GatherScatterConvolutionFuntion(Function):  # TorchSparse_v2
+
     @staticmethod
     # @custom_fwd(cast_inputs=torch.half)
     def forward(
@@ -51,14 +52,16 @@ class GatherScatterConvolutionFuntion(Function):  # TorchSparse_v2
 
         if not input.device.type == "cuda":
             if not transposed:
-                output = torch.zeros(
-                    sizes[1], weight.size(-1), dtype=input.dtype, device=input.device
-                )
+                output = torch.zeros(sizes[1],
+                                     weight.size(-1),
+                                     dtype=input.dtype,
+                                     device=input.device)
             else:
                 # TODO(Haotian): ensure the original, upsampled size to be the same.
-                output = torch.zeros(
-                    sizes[0], weight.size(-1), dtype=input.dtype, device=input.device
-                )
+                output = torch.zeros(sizes[0],
+                                     weight.size(-1),
+                                     dtype=input.dtype,
+                                     device=input.device)
 
         if input.device.type == "cuda":
             if torch.float16 in [input.dtype, weight.dtype]:
@@ -81,8 +84,7 @@ class GatherScatterConvolutionFuntion(Function):  # TorchSparse_v2
             )
         elif input.device.type == "cpu":
             torchsparse.backend.conv_forward_gather_scatter_cpu(
-                input, output, weight, nbmaps, nbsizes.cpu(), transposed
-            )
+                input, output, weight, nbmaps, nbsizes.cpu(), transposed)
         else:
             # use the native pytorch XLA APIs for the TPU.
             cur_st = 0

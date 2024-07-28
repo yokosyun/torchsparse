@@ -36,10 +36,14 @@ def test_to_dense_forward(
         num_points = np.prod(shape)
     num_points = [num_points] * batch_size
 
-    sparse_dict = generate_feature_map(shape, num_points, channel, dtype=np_dtype)
+    sparse_dict = generate_feature_map(shape,
+                                       num_points,
+                                       channel,
+                                       dtype=np_dtype)
 
     feats = np.ascontiguousarray(sparse_dict["feats"])
-    coords = np.ascontiguousarray(sparse_dict["coords"][:, [3, 0, 1, 2]])  # batch first
+    coords = np.ascontiguousarray(
+        sparse_dict["coords"][:, [3, 0, 1, 2]])  # batch first
     ref_dense_feats = sparse_dict["dense_feats"].transpose(0, 2, 3, 4, 1)
 
     coords_t = torch.from_numpy(coords).int().to(device)

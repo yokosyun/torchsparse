@@ -21,16 +21,14 @@ def find_maximal_match(support_list: List, target):
         return max_match_version
 
 
-torch_cuda_mapping = dict(
-    [
-        ("torch19", ["11.1"]),
-        ("torch110", ["11.1", "11.3"]),
-        ("torch111", ["11.3", "11.5"]),
-        ("torch112", ["11.3", "11.6"]),
-        ("torch113", ["11.6", "11.7"]),
-        ("torch20", ["11.7", "11.8"]),
-    ]
-)
+torch_cuda_mapping = dict([
+    ("torch19", ["11.1"]),
+    ("torch110", ["11.1", "11.3"]),
+    ("torch111", ["11.3", "11.5"]),
+    ("torch112", ["11.3", "11.6"]),
+    ("torch113", ["11.6", "11.7"]),
+    ("torch20", ["11.7", "11.8"]),
+])
 
 torch_tag, _ = ("torch" + torch.__version__).rsplit(".", 1)
 torch_tag = torch_tag.replace(".", "")
@@ -43,7 +41,6 @@ if torch.cuda.is_available():
 else:
     cuda_tag = "cpu"
 cuda_tag = cuda_tag.replace(".", "")
-
 
 os.system(
     f"pip install --extra-index-url http://24.199.104.228/simple --trusted-host 24.199.104.228 torchsparse=={__version__}+{torch_tag}{cuda_tag} --force-reinstall"

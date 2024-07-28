@@ -6,9 +6,8 @@ import torch
 __all__ = ["make_ntuple", "make_tensor", "make_divisible"]
 
 
-def make_ntuple(
-    x: Union[int, List[int], Tuple[int, ...], torch.Tensor], ndim: int
-) -> Tuple[int, ...]:
+def make_ntuple(x: Union[int, List[int], Tuple[int, ...], torch.Tensor],
+                ndim: int) -> Tuple[int, ...]:
     if isinstance(x, int):
         x = tuple(repeat(x, ndim))
     elif isinstance(x, list):

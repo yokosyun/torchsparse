@@ -23,7 +23,10 @@ def sparse_collate(inputs: List[SparseTensor]) -> SparseTensor:
         assert x.stride == stride, (x.stride, stride)
 
         input_size = x.coords.shape[0]
-        batch = torch.full((input_size, 1), k, device=x.coords.device, dtype=torch.int)
+        batch = torch.full((input_size, 1),
+                           k,
+                           device=x.coords.device,
+                           dtype=torch.int)
         coords.append(torch.cat((batch, x.coords), dim=1))
         feats.append(x.feats)
 
@@ -38,13 +41,14 @@ def sparse_collate_fn(inputs: List[Any]) -> Any:
         output = {}
         for name in inputs[0].keys():
             if isinstance(inputs[0][name], dict):
-                output[name] = sparse_collate_fn([input[name] for input in inputs])
+                output[name] = sparse_collate_fn(
+                    [input[name] for input in inputs])
             elif isinstance(inputs[0][name], np.ndarray):
                 output[name] = torch.stack(
-                    [torch.tensor(input[name]) for input in inputs], dim=0
-                )
+                    [torch.tensor(input[name]) for input in inputs], dim=0)
             elif isinstance(inputs[0][name], torch.Tensor):
-                output[name] = torch.stack([input[name] for input in inputs], dim=0)
+                output[name] = torch.stack([input[name] for input in inputs],
+                                           dim=0)
             elif isinstance(inputs[0][name], SparseTensor):
                 output[name] = sparse_collate([input[name] for input in inputs])
             else:

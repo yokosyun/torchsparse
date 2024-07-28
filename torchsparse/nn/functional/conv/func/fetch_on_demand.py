@@ -15,6 +15,7 @@ __all__ = ["FetchOnDemandConvolutionFuntion"]
 
 
 class FetchOnDemandConvolutionFuntion(Function):
+
     @staticmethod
     # @custom_fwd(cast_inputs=torch.half)
     def forward(
@@ -25,7 +26,6 @@ class FetchOnDemandConvolutionFuntion(Function):
         config: Dict,
         transposed: bool = False,
     ) -> torch.Tensor:
-
         """if transposed:
             input_nbmaps = kmap["nbmaps"][1, :]
             output_nbmaps = kmap["nbmaps"][0, :]
@@ -61,14 +61,16 @@ class FetchOnDemandConvolutionFuntion(Function):
 
         if not input.device.type == "cuda":
             if not transposed:
-                output = torch.zeros(
-                    sizes[1], weight.size(-1), dtype=input.dtype, device=input.device
-                )
+                output = torch.zeros(sizes[1],
+                                     weight.size(-1),
+                                     dtype=input.dtype,
+                                     device=input.device)
             else:
                 # TODO(Haotian): ensure the original, upsampled size to be the same.
-                output = torch.zeros(
-                    sizes[0], weight.size(-1), dtype=input.dtype, device=input.device
-                )
+                output = torch.zeros(sizes[0],
+                                     weight.size(-1),
+                                     dtype=input.dtype,
+                                     device=input.device)
 
         if input.device.type == "cuda":
             if torch.float16 in [input.dtype, weight.dtype]:
@@ -90,19 +92,18 @@ class FetchOnDemandConvolutionFuntion(Function):
                     torchsparse.backends.allow_fp16,
                 )
             else:
-                output = (
-                    torchsparse.backend.conv_forward_fetch_on_demand_no_fusion_cuda(
-                        input,
-                        weight,
-                        nbmaps,
-                        nbsizes.cpu(),
-                        mapsize,
-                        sizes[1] if not transposed else sizes[0],
-                        transposed,
-                        torchsparse.backends.allow_tf32,
-                        torchsparse.backends.allow_fp16,
-                    )
-                )
+                output = (torchsparse.backend.
+                          conv_forward_fetch_on_demand_no_fusion_cuda(
+                              input,
+                              weight,
+                              nbmaps,
+                              nbsizes.cpu(),
+                              mapsize,
+                              sizes[1] if not transposed else sizes[0],
+                              transposed,
+                              torchsparse.backends.allow_tf32,
+                              torchsparse.backends.allow_fp16,
+                          ))
 
         else:
             raise NotImplementedError

@@ -8,9 +8,9 @@ import torchsparse.backend
 __all__ = ["spdevoxelize", "calc_ti_weights"]
 
 
-def calc_ti_weights(
-    coords: torch.Tensor, idx_query: torch.Tensor, scale: float = 1
-) -> torch.Tensor:
+def calc_ti_weights(coords: torch.Tensor,
+                    idx_query: torch.Tensor,
+                    scale: float = 1) -> torch.Tensor:
     with torch.no_grad():
         p = coords
         if scale != 1:
@@ -43,31 +43,32 @@ def calc_ti_weights(
         w = torch.cat([w0, w1, w2, w3, w4, w5, w6, w7], dim=1)
         # w = w.transpose(1, 0).contiguous()
         if scale != 1:
-            w /= scale**3
+            w /= scale ** 3
         w[idx_query == -1] = 0
         w /= torch.sum(w, dim=1).unsqueeze(1) + 1e-8
     return w
 
 
 class DevoxelizeFunction(Function):
+
     @staticmethod
     # @custom_fwd(cast_inputs=torch.half)
-    def forward(
-        ctx, feats: torch.Tensor, coords: torch.Tensor, weights: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(ctx, feats: torch.Tensor, coords: torch.Tensor,
+                weights: torch.Tensor) -> torch.Tensor:
         feats = feats.contiguous()
         coords = coords.contiguous().int()
         weights = weights.contiguous()
 
         if feats.device.type == "cuda":
-            output = torchsparse.backend.devoxelize_forward_cuda(feats, coords, weights)
+            output = torchsparse.backend.devoxelize_forward_cuda(
+                feats, coords, weights)
         elif feats.device.type == "cpu":
-            output = torchsparse.backend.devoxelize_forward_cpu(feats, coords, weights)
+            output = torchsparse.backend.devoxelize_forward_cpu(
+                feats, coords, weights)
         else:
             device = feats.device
             output = torchsparse.backend.devoxelize_forward_cpu(
-                feats.cpu(), coords.cpu(), weights.cpu()
-            ).to(device)
+                feats.cpu(), coords.cpu(), weights.cpu()).to(device)
 
         ctx.for_backwards = (coords, weights, feats.shape[0])
         return output.to(feats.dtype)
@@ -80,22 +81,19 @@ class DevoxelizeFunction(Function):
 
         if grad_output.device.type == "cuda":
             grad_feats = torchsparse.backend.devoxelize_backward_cuda(
-                grad_output, coords, weights, input_size
-            )
+                grad_output, coords, weights, input_size)
         elif grad_output.device.type == "cpu":
             grad_feats = torchsparse.backend.devoxelize_backward_cpu(
-                grad_output, coords, weights, input_size
-            )
+                grad_output, coords, weights, input_size)
         else:
             device = grad_output.device
             grad_feats = torchsparse.backend.devoxelize_backward_cpu(
-                grad_output.cpu(), coords.cpu(), weights.cpu(), input_size
-            ).to(device)
+                grad_output.cpu(), coords.cpu(), weights.cpu(),
+                input_size).to(device)
 
         return grad_feats, None, None
 
 
-def spdevoxelize(
-    feats: torch.Tensor, coords: torch.Tensor, weights: torch.Tensor
-) -> torch.Tensor:
+def spdevoxelize(feats: torch.Tensor, coords: torch.Tensor,
+                 weights: torch.Tensor) -> torch.Tensor:
     return DevoxelizeFunction.apply(feats, coords, weights)
