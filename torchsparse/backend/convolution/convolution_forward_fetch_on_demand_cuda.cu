@@ -1982,8 +1982,8 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
         if (allow_tf32) {
           const int BLOCK_SIZE = 32;
           const int N_LOOP = 4;
-          fetch_on_demand_gemm_fp16_tc4_async<32, N_LOOP, 8, 16, 16, 16, 4, 2,
-                                              2>
+          fetch_on_demand_gemm_fp16_tc4_async<BLOCK_SIZE, N_LOOP, 8, 16, 16, 16,
+                                              4, 2, 2>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
                  dim3(8, BLOCK_SIZE, 1)>>>(
