@@ -107,13 +107,13 @@ class TestTorchConv(nn.Module):
 def test_single_layer_convolution_forward(
     batch_size: int = 1,
     shape: Union[int, Tuple[int, ...]] = 5,
-    num_points: int = 20,
+    num_points: int = 125,
     IC: int = 16,
     OC: int = 32,
     kernel_size: int = 3,
     stride: int = 1,
     device="cuda:0",
-    is_half=True,
+    is_half=False,
 ):
 
     np.random.seed(0)
