@@ -9,13 +9,13 @@ import torch.optim
 
 
 NUM_PC_CHANNELS = 4
-VOXEL_SIZE = 0.1
+VOXEL_SIZE = (0.1, 0.1, 0.1)
 MAX_X = 200
 MAX_Y = 200
 MAX_Z = 4
 NUM_PC = MAX_X * MAX_Y * MAX_Z
 
-
+import torchsparse
 from torchsparse import SparseTensor
 from torchsparse.utils.collate import sparse_collate_fn
 from torchsparse.utils.quantize import sparse_quantize
@@ -23,7 +23,7 @@ from torchsparse.utils.tensor_cache import TensorCache
 
 
 def generate_random_point_cloud(size, voxel_size):
-    pc = np.random.randn(size, NUM_PC_CHANNELS)
+    # pc = np.random.randn(size, NUM_PC_CHANNELS)
     # pc[:, :3] = pc[:, :3] * 10
     pc = np.fromfile(
         "data/n015-2018-07-24-11-22-45+0800__LIDAR_TOP__1532402927647951.pcd.bin",
@@ -70,55 +70,79 @@ def dummy_train_3x3(device):
     torch.cuda.set_device(0)
 
     model = nn.Sequential(
-        spnn.Conv3d(4, 32, kernel_size=3, stride=1, **kargs1),
+        spnn.Conv3d(4, 16, kernel_size=3, stride=1, **kargs1),
+        spnn.Conv3d(16, 32, kernel_size=3, stride=1, **kargs1),
+        spnn.Conv3d(32, 32, kernel_size=3, stride=1, **kargs1),
         spnn.Conv3d(32, 64, kernel_size=3, stride=1, **kargs1),
+        spnn.Conv3d(64, 64, kernel_size=3, stride=1, **kargs1),
         spnn.Conv3d(64, 128, kernel_size=3, stride=1, **kargs1),
-        spnn.Conv3d(128, 256, kernel_size=3, stride=1, **kargs1),
-        spnn.Conv3d(256, 128, kernel_size=3, stride=1, **kargs1, **kargs2),
-        spnn.Conv3d(128, 64, kernel_size=3, stride=1, **kargs1, **kargs2),
-        spnn.Conv3d(64, 32, kernel_size=3, stride=1, **kargs1, **kargs2),
-        spnn.Conv3d(32, 10, kernel_size=3, stride=1, **kargs1, **kargs2),
+        spnn.Conv3d(128, 128, kernel_size=3, stride=1, **kargs1),
+        # spnn.Conv3d(128, 256, kernel_size=3, stride=1, **kargs1),
+        # spnn.Conv3d(256, 256, kernel_size=3, stride=1, **kargs1),
+        # spnn.Conv3d(256, 128, kernel_size=3, stride=1, **kargs1, **kargs2),
+        # spnn.Conv3d(128, 64, kernel_size=3, stride=1, **kargs1, **kargs2),
+        # spnn.Conv3d(64, 32, kernel_size=3, stride=1, **kargs1, **kargs2),
+        # spnn.Conv3d(32, 10, kernel_size=3, stride=1, **kargs1, **kargs2),
     ).to(device)
+
+    # model = nn.Sequential(
+    # spnn.Conv3d(4, 32, kernel_size=3, stride=1, **kargs1),
+    # spnn.Conv3d(32, 32, kernel_size=3, stride=1, **kargs1),
+    # spnn.Conv3d(32, 32, kernel_size=3, stride=1, **kargs1),
+    # spnn.Conv3d(32, 32, kernel_size=3, stride=1, **kargs1),
+    # spnn.Conv3d(256, 128, kernel_size=3, stride=1, **kargs1, **kargs2),
+    # spnn.Conv3d(128, 64, kernel_size=3, stride=1, **kargs1, **kargs2),
+    # spnn.Conv3d(64, 32, kernel_size=3, stride=1, **kargs1, **kargs2),
+    # spnn.Conv3d(32, 10, kernel_size=3, stride=1, **kargs1, **kargs2),
+    # ).to(device)
     model.eval()
 
     feed_dict = generate_batched_random_point_clouds(size=NUM_PC, voxel_size=VOXEL_SIZE)
 
-    if False:
-        with torch.profiler.profile(
-            profile_memory=True,
-            use_cuda=True,
-            schedule=torch.profiler.schedule(wait=1, warmup=1, active=2, repeat=1),
-        ) as prof:
-            with profiler.record_function("model_inference"):
-                for _ in range(100):
-                    inputs = feed_dict["input"].to(device)
-                    inputs._caches = TensorCache()
-                    model(inputs)
-                    prof.step()
+    torchsparse.backends.benchmark = False
 
-        print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
-        prof.export_chrome_trace("trace_dummy_3x3.json")
+    with torch.no_grad():
+        # if True:
+        if False:
+            with torch.profiler.profile(
+                profile_memory=True,
+                use_cuda=True,
+                schedule=torch.profiler.schedule(wait=1, warmup=1, active=2, repeat=1),
+            ) as prof:
+                with profiler.record_function("model_inference"):
+                    for _ in range(100):
+                        inputs = feed_dict["input"].to(device)
+                        inputs._caches = TensorCache()
+                        model(inputs)
+                        prof.step()
 
-    else:
-        inputs = feed_dict["input"].to(device)
+            print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+            prof.export_chrome_trace("trace_dummy_3x3.json")
 
-        warmup_iter = 10
-        for _ in range(warmup_iter):
-            inputs._caches = TensorCache()
-            model(inputs)
+        else:
+            inputs = feed_dict["input"].to(device)
 
-        active_iter = 100
+            warmup_iter = 10
+            for _ in range(warmup_iter):
+                inputs._caches = TensorCache()
+                model(inputs)
 
-        for _ in range(active_iter):
-            start_time = time.time()
-            inputs._caches = TensorCache()
-            model(inputs)
-            end_time = time.time()
-            avg_time = (end_time - start_time) * 1000
-            print(f"avg time= {avg_time:.2f} [ms]")
+            time_buffer = []
 
-        # avg_time = (end_time -start_time) / active_iter * 1000
-        # print(f"avg time= {avg_time:.2f} [ms]")
+            active_iter = 100
+
+            for _ in range(active_iter):
+                start_time = time.time()
+                inputs._caches = TensorCache()
+                model(inputs)
+                end_time = time.time()
+                duration = (end_time - start_time) * 1000
+
+                time_buffer.append(duration)
+                # print(f"duration= {duration:.2f} [ms]")
+
+            # avg_time = sum(time_buffer) / len(time_buffer)
+            # print(f"avg time= {avg_time:.2f} [ms]")
 
 
 if __name__ == "__main__":

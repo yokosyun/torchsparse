@@ -25,6 +25,8 @@ def conv3d(
     generative: bool = False,
     training: bool = False,
 ) -> SparseTensor:
+    torch.cuda.synchronize()
+    all_start_time = time.time()
     from torchsparse.nn import functional as F
 
     use_separate_branch = False
@@ -91,6 +93,8 @@ def conv3d(
         spatial_range = input.spatial_range
 
         if kmap is None:
+            # torch.cuda.synchronize()
+            # start_time = time.time()
             kmap = F.build_kernel_map(
                 coords,
                 feats.shape[0],
@@ -111,17 +115,20 @@ def conv3d(
 
             hashmap = [kmap["hashmap_keys"], kmap["hashmap_vals"]]
 
-            # start_time = time.time()
             if use_separate_branch:
                 has_operation = kmap["out_in_map"] >= 0
                 sum_operations = torch.sum(has_operation, axis=1)
                 has_dependency = sum_operations > 1
 
                 n_coords = coords.shape[0]
-                non_dep_coords = coords[~has_dependency[:n_coords]]
-                non_dep_feats = feats[~has_dependency[:n_coords]]
+                # print(torch.sum(has_dependency))
+                # non_dep_coords = coords[~has_dependency[:n_coords]][:MAX_LIMIT]
+                # non_dep_feats = feats[~has_dependency[:n_coords]][:MAX_LIMIT]
                 coords = coords[has_dependency[:n_coords]]
                 feats = feats[has_dependency[:n_coords]]
+                # n_dependency = torch.sum(has_dependency)
+                # coords = coords[:n_dependency]
+                # feats = feats[:n_dependency]
 
                 kmap = F.build_kernel_map(
                     coords,
@@ -129,8 +136,8 @@ def conv3d(
                     kernel_size,
                     stride,
                     padding,
-                    kmap["hashmap_keys"],
-                    kmap["hashmap_vals"],
+                    hashmap_keys,
+                    hashmap_vals,
                     spatial_range,
                     kmap_mode,
                     dataflow,
@@ -140,6 +147,9 @@ def conv3d(
                     split_mask_num=config.split_mask_num,
                     split_mask_num_bwd=config.split_mask_num_bwd,
                 )
+
+                # kmap["out_in_map"][:, :] = -1
+                # print(torch.sum(kmap["out_in_map"][:, 13] < 0))
 
                 visualize = False
                 if visualize:
@@ -153,17 +163,20 @@ def conv3d(
                     )
                     non_dep_pcd.paint_uniform_color([1, 0, 0])
 
-                    dep_coords = dep_coords.cpu().numpy()
+                    dep_coords = coords.cpu().numpy()
                     dep_pcd = o3d.geometry.PointCloud()
                     dep_pcd.points = o3d.utility.Vector3dVector(dep_coords[:, 1:])
                     dep_pcd.paint_uniform_color([0, 0, 1])
                     o3d.visualization.draw_geometries([non_dep_pcd, dep_pcd])
                     exit()
+            # torch.cuda.synchronize()
             # end_time = time.time()
-            # print((end_time - start_time) * 1000, "[ms]")
+            # print("build_kernel_map=", (end_time - start_time) * 1000, "[ms]")
 
             input._caches.kmaps[(input.stride, kernel_size, stride, dilation)] = kmap
             input._caches.hashmaps[input.stride] = hashmap
+
+        # start_time = time.time()
 
         feats = ConvolutionFunction.apply(
             feats,
@@ -172,6 +185,9 @@ def conv3d(
             config,
             transposed,
         )
+
+        # end_time = time.time()
+        # print((end_time - start_time) * 1000, "[ms]")
 
         if bias is not None:
             feats += bias
@@ -261,9 +277,14 @@ def conv3d(
         output.stride, (output.coords, output.spatial_range)
     )
 
-    if use_separate_branch:
-        output.non_dep_feats = non_dep_feats @ weight[13]
-        if bias is not None:
-            output.non_dep_feats += bias
+    # if use_separate_branch:
+    # output.non_dep_feats = non_dep_feats @ weight[13]
+    # if bias is not None:
+    #     output.non_dep_feats += bias
+    torch.cuda.synchronize()
+    all_end_time = time.time()
+
+    if input.feats.shape[1] == 256:
+        print("total=", (all_end_time - all_start_time) * 1000, "[ms]")
 
     return output

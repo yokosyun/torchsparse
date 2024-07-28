@@ -25,7 +25,6 @@ class FetchOnDemandConvolutionFuntion(Function):
         config: Dict,
         transposed: bool = False,
     ) -> torch.Tensor:
-
         """if transposed:
             input_nbmaps = kmap["nbmaps"][1, :]
             output_nbmaps = kmap["nbmaps"][0, :]

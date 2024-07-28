@@ -12,7 +12,6 @@ __pack_half2(const half x, const half y)
   return (v1 << 16) | v0;
 }
 
-
 // conv_forward_cuda_m128n16k16_m64n16k16_m16n16k16_f16f16f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f16f16f32(int M, int K_original, int N, int kernel_volume, half *__restrict__ A, half *__restrict__ B, int *__restrict__ out_in_map, half *__restrict__ C)
@@ -115,9 +114,9 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f16f16f32
       if (input_idx != -1)
       {
         /*
-          *(uint4 *)(A_shared + ((((ax0_ax1_fused_0 * 1280) + (((int)threadIdx.y) * 640)) + ((((int)threadIdx.x) >> 1) * 40)) + ((((int)threadIdx.x) & 1) * 8))) =
-          *(uint4 *)(A_ptr_local + input_idx * K_original + ((ax0_ax1_fused_0 * 512 % 16) % K_original));
-          */
+         *(uint4 *)(A_shared + ((((ax0_ax1_fused_0 * 1280) + (((int)threadIdx.y) * 640)) + ((((int)threadIdx.x) >> 1) * 40)) + ((((int)threadIdx.x) & 1) * 8))) =
+         *(uint4 *)(A_ptr_local + input_idx * K_original + ((ax0_ax1_fused_0 * 512 % 16) % K_original));
+         */
         uint4 A_loaded = make_uint4(0, 0, 0, 0);
         // global_load<K_ld_factor>(A_loaded, A_ptr_local + input_idx * K_original + ((ax0_ax1_fused_0 * 512 % 16) % K_original), A_pred_guard);
         global_load<K_ld_factor>(A_loaded, A_ptr_local + input_idx * K_original + ((ax0_ax1_fused_0 * 512 % 16) % K_tile_padded), A_pred_guard);
@@ -132,9 +131,9 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f16f16f32
     if (threadIdx.y == 0)
     {
       /*
-        *(uint4 *)(B_shared + (((((int)threadIdx.y) * 640) + ((((int)threadIdx.x) >> 1) * 40)) + ((((int)threadIdx.x) & 1) * 8))) =
-        *(uint4 *)(B_ptr_local);
-        */
+       *(uint4 *)(B_shared + (((((int)threadIdx.y) * 640) + ((((int)threadIdx.x) >> 1) * 40)) + ((((int)threadIdx.x) & 1) * 8))) =
+       *(uint4 *)(B_ptr_local);
+       */
       uint4 B_loaded = make_uint4(0, 0, 0, 0);
       global_load<N_ld_factor>(B_loaded, B_ptr_local, B_pred_guard);
       *(uint4 *)(B_shared + (((((int)threadIdx.y) * 640) + ((((int)threadIdx.x) >> 1) * 40)) + ((((int)threadIdx.x) & 1) * 8))) = B_loaded;
@@ -158,7 +157,7 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f16f16f32
             : "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[0]), "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[1]), "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[2]), "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[3])
             : "r"(addr));
 #else
-  #pragma message("FP16 kernels will not be compiled for SM75-.")
+#pragma message("FP16 kernels will not be compiled for SM75-.")
 #endif
       }
     }
@@ -176,7 +175,7 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f16f16f32
           : "=r"(((unsigned *)(B_shared_warp + 0))[0]), "=r"(((unsigned *)(B_shared_warp + 0))[1]), "=r"(((unsigned *)(B_shared_warp + 0))[2]), "=r"(((unsigned *)(B_shared_warp + 0))[3])
           : "r"(addr));
 #else
-  #pragma message("FP16 kernels will not be compiled for SM75-.")
+#pragma message("FP16 kernels will not be compiled for SM75-.")
 #endif
     }
     for (int i0_0_3 = 0; i0_0_3 < 4; ++i0_0_3)
@@ -230,7 +229,7 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f16f16f32
             : "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[0]), "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[1]), "r"(((unsigned *)(B_shared_warp + 6))[0]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[0]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[1]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[2]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[3]));
       }
 #else
-  #pragma message("FP16 kernels will not be compiled for SM75-.")
+#pragma message("FP16 kernels will not be compiled for SM75-.")
 #endif
     }
   }
@@ -348,7 +347,7 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting2_mode0_f16f16f32
               : "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[0]), "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[1]), "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[2]), "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[3])
               : "r"(addr));
 #else
-  #pragma message("FP16 kernels will not be compiled for SM75-.")
+#pragma message("FP16 kernels will not be compiled for SM75-.")
 #endif
         }
       }
@@ -366,7 +365,7 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting2_mode0_f16f16f32
             : "=r"(((unsigned *)(B_shared_warp + 0))[0]), "=r"(((unsigned *)(B_shared_warp + 0))[1]), "=r"(((unsigned *)(B_shared_warp + 0))[2]), "=r"(((unsigned *)(B_shared_warp + 0))[3])
             : "r"(addr));
 #else
-  #pragma message("FP16 kernels will not be compiled for SM75-.")
+#pragma message("FP16 kernels will not be compiled for SM75-.")
 #endif
       }
       for (int i0_0_3 = 0; i0_0_3 < 4; ++i0_0_3)
@@ -418,10 +417,10 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting2_mode0_f16f16f32
               : "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[0]), "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[1]), "r"(((unsigned *)(B_shared_warp + 6))[0]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[0]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[1]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[2]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[3]));
         }
 #else
-  #pragma message("FP16 kernels will not be compiled for SM75-.")
+#pragma message("FP16 kernels will not be compiled for SM75-.")
 #endif
       }
-  }
+    }
   }
   for (int ax0_0_1 = 0; ax0_0_1 < 4; ++ax0_0_1)
   {
@@ -536,7 +535,7 @@ __global__ void __launch_bounds__(128) conv_forward_cuda_setting3_mode0_f16f16f3
               : "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[0]), "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[1]), "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[2]), "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[3])
               : "r"(addr));
 #else
-  #pragma message("FP16 kernels will not be compiled for SM75-.")
+#pragma message("FP16 kernels will not be compiled for SM75-.")
 #endif
         }
       }
@@ -555,7 +554,7 @@ __global__ void __launch_bounds__(128) conv_forward_cuda_setting3_mode0_f16f16f3
               : "=r"(((unsigned *)(B_shared_warp + (ax1_0 * 8)))[0]), "=r"(((unsigned *)(B_shared_warp + (ax1_0 * 8)))[1]), "=r"(((unsigned *)(B_shared_warp + (ax1_0 * 8)))[2]), "=r"(((unsigned *)(B_shared_warp + (ax1_0 * 8)))[3])
               : "r"(addr));
 #else
-  #pragma message("FP16 kernels will not be compiled for SM75-.")
+#pragma message("FP16 kernels will not be compiled for SM75-.")
 #endif
         }
       }
@@ -609,10 +608,10 @@ __global__ void __launch_bounds__(128) conv_forward_cuda_setting3_mode0_f16f16f3
                 : "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[0]), "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[1]), "r"(((unsigned *)(B_shared_warp + ((i1_0_4 * 8) + 6)))[0]), "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[0]), "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[1]), "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[2]), "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[3]));
           }
 #else
-  #pragma message("FP16 kernels will not be compiled for SM75-.")
+#pragma message("FP16 kernels will not be compiled for SM75-.")
 #endif
-          }
         }
+      }
     }
   }
   for (int ax0_0_1 = 0; ax0_0_1 < 4; ++ax0_0_1)
@@ -808,7 +807,7 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting1_mode0_tf32tf32f
             : "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[0]), "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[1]), "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[2]), "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[3]), "r"(((unsigned *)(B_shared_warp + 6))[0]), "r"(((unsigned *)(B_shared_warp + 6))[1]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[0]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[1]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[2]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[3]));
       }
 #else
-  #pragma message("TF32 kernels will not be compiled.")
+#pragma message("TF32 kernels will not be compiled.")
 #endif
     }
   }
@@ -956,8 +955,8 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting2_mode0_tf32tf32f
               : "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[0]), "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[1]), "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[2]), "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[3]), "r"(((unsigned *)(B_shared_warp + 6))[0]), "r"(((unsigned *)(B_shared_warp + 6))[1]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[0]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[1]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[2]), "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[3]));
         }
 #else
-  #pragma message("TF32 kernels will not be compiled.")
-#endif 
+#pragma message("TF32 kernels will not be compiled.")
+#endif
       }
     }
   }
@@ -1048,12 +1047,11 @@ __global__ void __launch_bounds__(128) conv_forward_cuda_setting3_mode0_tf32tf32
     {
       // Shang: skip loading B
       int B_kernel_offset_local = (B_kernel_offset + i2_0_0 * 32 + ax0_ax1_fused_0_1 * 1024 / 64) / K_original;
-      
+
       *(ulonglong4 *)(B_shared + ((((ax0_ax1_fused_0_1 * 1152) + (((int)threadIdx.y) * 288)) + ((((int)threadIdx.x) >> 3) * 72)) + ((((int)threadIdx.x) & 7) * 8))) =
           // original:
           // *(ulonglong4*)(B + ((((i2_0_0 * 2048) + (ax0_ax1_fused_0_1 * 1024)) + (((int)threadIdx.y) * 256)) + (((int)threadIdx.x) * 8)));
           *(ulonglong4 *)(B_ptr_local + ax0_ax1_fused_0_1 * 1024 * N / 64);
-      
     }
     __syncthreads();
 
@@ -1107,11 +1105,10 @@ __global__ void __launch_bounds__(128) conv_forward_cuda_setting3_mode0_tf32tf32
                 : "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[0]), "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[1]), "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[2]), "r"(((unsigned *)(A_shared_warp + ((i0_0_3 * 8) + 4)))[3]), "r"(((unsigned *)(B_shared_warp + ((i1_0_4 * 8) + 6)))[0]), "r"(((unsigned *)(B_shared_warp + ((i1_0_4 * 8) + 6)))[1]), "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[0]), "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[1]), "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[2]), "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[3]));
           }
 #else
-  #pragma message("TF32 kernels will not be compiled.")
-#endif 
+#pragma message("TF32 kernels will not be compiled.")
+#endif
         }
       }
-      
     }
   }
   for (int ax0_0_1 = 0; ax0_0_1 < 4; ++ax0_0_1)
@@ -1136,11 +1133,11 @@ __global__ void __launch_bounds__(128) conv_forward_cuda_setting3_mode0_tf32tf32
     }
   }
 }
-//#endif
+// #endif
 
 // conv_forward_cuda_m128n16k16_f32f32f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f32f32f32(int M, int K_original, int N, int kernel_volume, float* __restrict__ A, float* __restrict__ B, int* __restrict__ out_in_map, float* __restrict__ C) 
+__global__ void __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f32f32f32(int M, int K_original, int N, int kernel_volume, float *__restrict__ A, float *__restrict__ B, int *__restrict__ out_in_map, float *__restrict__ C)
 {
 
   const int K_tile = 16;
@@ -1151,36 +1148,33 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f32f32f32
   __shared__ float A_shared[2048];
   __shared__ float B_shared[256];
 
-  #pragma unroll
-  for (int i = 0; i < 32; ++i)   
+#pragma unroll
+  for (int i = 0; i < 32; ++i)
   {
     C_local[i] = 0.0;
   }
-  
+
   int K_loops = K_implicit / 16;
-  int block_num_n = (N - 1) / 16 + 1; 
+  int block_num_n = (N - 1) / 16 + 1;
   int blockIdx_m = (int)blockIdx.x / block_num_n;
   int blockIdx_n = (int)blockIdx.x % block_num_n;
   int threadIdx_x = (int)threadIdx.x;
 
   // hoisting shared pointer offsets
-  int * out_in_map_ptr = out_in_map 
-                         + (blockIdx_m * 128 + (threadIdx_x / (16/4)))* kernel_volume;  
+  int *out_in_map_ptr = out_in_map + (blockIdx_m * 128 + (threadIdx_x / (16 / 4))) * kernel_volume;
 
-  float * B_ptr = B 
-                  + (threadIdx_x / (16/4)) * N 
-                  + (blockIdx_n * 16) + ((threadIdx_x * 4) % 16); 
+  float *B_ptr = B + (threadIdx_x / (16 / 4)) * N + (blockIdx_n * 16) + ((threadIdx_x * 4) % 16);
 
-  float * A_shared_ptr = A_shared + (threadIdx_x * 4);
-  float * A_shared_reduce_ptr =  A_shared + ((threadIdx_x / 4) * 16); 
-  float * B_shared_ptr = B_shared + (threadIdx_x * 4);
-  float * B_shared_reduce_ptr = B_shared + (threadIdx_x % 4);
+  float *A_shared_ptr = A_shared + (threadIdx_x * 4);
+  float *A_shared_reduce_ptr = A_shared + ((threadIdx_x / 4) * 16);
+  float *B_shared_ptr = B_shared + (threadIdx_x * 4);
+  float *B_shared_reduce_ptr = B_shared + (threadIdx_x % 4);
 
-  // float * C_ptr = C 
-                      // // + (blockIdx_m * 128 + (threadIdx_x / 4)) * N
-                      // + blockIdx_n * 16 + (threadIdx_x % 4);
-  int location_offset = blockIdx_m * 128 + (threadIdx_x / 4);  // C_m_offset
-  int C_n_offset = blockIdx_n * 16  + (threadIdx_x % 4);
+  // float * C_ptr = C
+  // // + (blockIdx_m * 128 + (threadIdx_x / 4)) * N
+  // + blockIdx_n * 16 + (threadIdx_x % 4);
+  int location_offset = blockIdx_m * 128 + (threadIdx_x / 4); // C_m_offset
+  int C_n_offset = blockIdx_n * 16 + (threadIdx_x % 4);
 
   int channel_offset_A = ((threadIdx_x * 4) % 16);
 
@@ -1199,8 +1193,9 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f32f32f32
   else
     B_pred_guard = 1;
 
-  #pragma unroll
-  for (int k_0 = 0; k_0 < K_loops; ++k_0) {
+#pragma unroll
+  for (int k_0 = 0; k_0 < K_loops; ++k_0)
+  {
 
     {
       if constexpr (K_ld_check)
@@ -1227,301 +1222,287 @@ __global__ void __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f32f32f32
           B_pred_guard |= (1 << i);
       }
 
-      int* out_in_map_ptr_local = out_in_map_ptr + k_0 * 16 / K_tile_padded;
-      float* A_ptr_local = A  + (k_0 * 16 % K_tile_padded) + channel_offset_A;  
+      int *out_in_map_ptr_local = out_in_map_ptr + k_0 * 16 / K_tile_padded;
+      float *A_ptr_local = A + (k_0 * 16 % K_tile_padded) + channel_offset_A;
 
       // float *B_ptr_local = B_ptr + i2_0_0 * K_tile * N;
-      float* B_ptr_local;
+      float *B_ptr_local;
       if constexpr (K_ld_check)
         B_ptr_local = B_ptr + (k_0 * K_tile / K_tile_padded * K_original + k_0 * K_tile % K_tile_padded) * N;
       else
         B_ptr_local = B_ptr + k_0 * K_tile * N;
 
       __syncthreads();
-      #pragma unroll
+#pragma unroll
       for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 8; ++ax0_ax1_fused_0)
       {
 
-        int input_idx = *(out_in_map_ptr_local + (ax0_ax1_fused_0 *16) * kernel_volume); 
+        int input_idx = *(out_in_map_ptr_local + (ax0_ax1_fused_0 * 16) * kernel_volume);
         if (input_idx != -1)
         {
           // *(float4*)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) =  // ax0_ax1_fused_0 * elements loaded in each loop
           //     *(float4*)(A + (input_idx * K_original) + channel_offset);
           uint4 A_loaded = make_uint4(0, 0, 0, 0);
-          global_load<K_ld_factor>(A_loaded, A_ptr_local + (input_idx * K_original) , A_pred_guard);
+          global_load<K_ld_factor>(A_loaded, A_ptr_local + (input_idx * K_original), A_pred_guard);
           *(uint4 *)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) = A_loaded;
         }
-        else 
+        else
         {
           // *(float4*)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) = make_float4(0.0, 0.0, 0.0, 0.0);
-          *(uint4*)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) = make_uint4(0, 0, 0, 0);
+          *(uint4 *)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) = make_uint4(0, 0, 0, 0);
         }
       }
 
-      #pragma unroll
+#pragma unroll
       for (int ax0_ax1_fused_0_1 = 0; ax0_ax1_fused_0_1 < 1; ++ax0_ax1_fused_0_1)
       {
         // *(float4*)(B_shared_ptr + (ax0_ax1_fused_0_1 * 256)) =                 // ax0_ax1_fused_0_1 * elements loaded in each loop
         //       *(float4*)(B_ptr_local + (ax0_ax1_fused_0_1 * 16) * N);
         uint4 B_loaded = make_uint4(0, 0, 0, 0);
-        global_load<N_ld_factor>(B_loaded, B_ptr_local + (ax0_ax1_fused_0_1 * 16) * N, B_pred_guard); 
+        global_load<N_ld_factor>(B_loaded, B_ptr_local + (ax0_ax1_fused_0_1 * 16) * N, B_pred_guard);
         *(uint4 *)(B_shared_ptr + (ax0_ax1_fused_0_1 * 256)) = B_loaded;
       }
 
       __syncthreads();
-      #pragma unroll
-      for (int k_1 = 0; k_1 < ( 16 / 4); ++k_1) 
+#pragma unroll
+      for (int k_1 = 0; k_1 < (16 / 4); ++k_1)
       {
-        #pragma unroll
-        for (int k_2 = 0; k_2 < 4; ++k_2) 
+#pragma unroll
+        for (int k_2 = 0; k_2 < 4; ++k_2)
         {
           int vk_in_block = (k_1 << 2) + k_2;
-          #pragma unroll
-          for (int i = 0; i < 32; ++i) 
+#pragma unroll
+          for (int i = 0; i < 32; ++i)
           {
-            C_local[i] = C_local[i] + 
-                            A_shared_reduce_ptr[((i / 4) * 16) * 16 + vk_in_block] 
-                            * B_shared_reduce_ptr[(vk_in_block * 16) + ((i % 4) * 4)];
-
+            C_local[i] = C_local[i] +
+                         A_shared_reduce_ptr[((i / 4) * 16) * 16 + vk_in_block] * B_shared_reduce_ptr[(vk_in_block * 16) + ((i % 4) * 4)];
           }
         }
       }
     }
   }
 
-  #pragma unroll
+#pragma unroll
   for (int i = 0; i < 32; ++i)
   {
-      int location_cur = location_offset + ((i / 4) * 16);
-      int vn = C_n_offset + ((i % 4) * 4); 
+    int location_cur = location_offset + ((i / 4) * 16);
+    int vn = C_n_offset + ((i % 4) * 4);
 
-      if constexpr (N_ld_check)
-      {
-        if (vn < N && location_cur < M)
-          C[location_cur * N + vn] = C_local[i];
-      }
-      else
-      {
-        if (location_cur < M)
-          C[location_cur * N + vn] = C_local[i];
-      }
+    if constexpr (N_ld_check)
+    {
+      if (vn < N && location_cur < M)
+        C[location_cur * N + vn] = C_local[i];
+    }
+    else
+    {
+      if (location_cur < M)
+        C[location_cur * N + vn] = C_local[i];
+    }
   }
 }
 
 // conv_forward_cuda_m128n16k32_f32f32f32
-__global__ void __launch_bounds__(64) conv_forward_cuda_setting2_mode0_f32f32f32(int M, int K_original, int N, int kernel_volume, float* __restrict__ A, float* __restrict__ B, int* __restrict__ out_in_map, float* __restrict__ C) 
+__global__ void __launch_bounds__(64) conv_forward_cuda_setting2_mode0_f32f32f32(int M, int K_original, int N, int kernel_volume, float *__restrict__ A, float *__restrict__ B, int *__restrict__ out_in_map, float *__restrict__ C)
 {
   float C_local[32];
   __shared__ float A_shared[4096];
   __shared__ float B_shared[512];
 
-  #pragma unroll
-  for (int i = 0; i < 32; ++i)   
+#pragma unroll
+  for (int i = 0; i < 32; ++i)
   {
     C_local[i] = 0.0;
   }
-  
+
   int K_loops = (K_original * kernel_volume - 1) / 32 + 1;
-  int block_num_n = (N - 1) / 16 + 1; 
+  int block_num_n = (N - 1) / 16 + 1;
   int blockIdx_m = (int)blockIdx.x / block_num_n;
   int blockIdx_n = (int)blockIdx.x % block_num_n;
   int threadIdx_x = (int)threadIdx.x;
 
   // hoisting shared pointer offsets
-  int * out_in_map_ptr = out_in_map 
-                         + (blockIdx_m * 128 + (threadIdx_x / (32/4)))* kernel_volume;  
+  int *out_in_map_ptr = out_in_map + (blockIdx_m * 128 + (threadIdx_x / (32 / 4))) * kernel_volume;
 
-  float * B_ptr = B 
-                  + (threadIdx_x / (16/4)) * N 
-                  + (blockIdx_n * 16) + ((threadIdx_x * 4) % 16); 
+  float *B_ptr = B + (threadIdx_x / (16 / 4)) * N + (blockIdx_n * 16) + ((threadIdx_x * 4) % 16);
 
-  float * A_shared_ptr = A_shared + (threadIdx_x * 4);
-  float * A_shared_reduce_ptr =  A_shared + ((threadIdx_x / 4) * 32); 
-  float * B_shared_ptr = B_shared + (threadIdx_x * 4);
-  float * B_shared_reduce_ptr = B_shared + (threadIdx_x % 4);
+  float *A_shared_ptr = A_shared + (threadIdx_x * 4);
+  float *A_shared_reduce_ptr = A_shared + ((threadIdx_x / 4) * 32);
+  float *B_shared_ptr = B_shared + (threadIdx_x * 4);
+  float *B_shared_reduce_ptr = B_shared + (threadIdx_x % 4);
 
-  // float * C_ptr = C 
-                      // // + (blockIdx_m * 128 + (threadIdx_x / 4)) * N
-                      // + blockIdx_n * 16 + (threadIdx_x % 4);
-  int location_offset = blockIdx_m * 128 + (threadIdx_x / 4);  // C_m_offset
-  int C_n_offset = blockIdx_n * 16  + (threadIdx_x % 4);
+  // float * C_ptr = C
+  // // + (blockIdx_m * 128 + (threadIdx_x / 4)) * N
+  // + blockIdx_n * 16 + (threadIdx_x % 4);
+  int location_offset = blockIdx_m * 128 + (threadIdx_x / 4); // C_m_offset
+  int C_n_offset = blockIdx_n * 16 + (threadIdx_x % 4);
 
   int channel_offset_A = ((threadIdx_x * 4) % 32); // mod K_tile=32
 
-  #pragma unroll
-  for (int k_0 = 0; k_0 < K_loops; ++k_0) {
+#pragma unroll
+  for (int k_0 = 0; k_0 < K_loops; ++k_0)
+  {
 
-    int channel_offset = k_0 % (K_original / 32) * 32 + channel_offset_A; 
+    int channel_offset = k_0 % (K_original / 32) * 32 + channel_offset_A;
     int kernel_offset = k_0 / (K_original / 32);
     int *out_in_map_ptr_k = out_in_map_ptr + kernel_offset;
 
     {
       __syncthreads();
-      #pragma unroll
+#pragma unroll
       for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 16; ++ax0_ax1_fused_0)
       {
 
-        int input_idx = *(out_in_map_ptr_k + (ax0_ax1_fused_0 *8) * kernel_volume); 
-        if (input_idx != -1) 
+        int input_idx = *(out_in_map_ptr_k + (ax0_ax1_fused_0 * 8) * kernel_volume);
+        if (input_idx != -1)
         {
 
-          *(float4*)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) =  // ax0_ax1_fused_0 * elements loaded in each loop
-              *(float4*)(A + (input_idx * K_original) + channel_offset);
-
+          *(float4 *)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) = // ax0_ax1_fused_0 * elements loaded in each loop
+              *(float4 *)(A + (input_idx * K_original) + channel_offset);
         }
-        else {
+        else
+        {
 
-          *(float4*)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) = make_float4(0.0, 0.0, 0.0, 0.0);
-
+          *(float4 *)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) = make_float4(0.0, 0.0, 0.0, 0.0);
         }
       }
 
-      #pragma unroll
-      for (int ax0_ax1_fused_0_1 = 0; ax0_ax1_fused_0_1 < 2; ++ax0_ax1_fused_0_1)    
+#pragma unroll
+      for (int ax0_ax1_fused_0_1 = 0; ax0_ax1_fused_0_1 < 2; ++ax0_ax1_fused_0_1)
       {
 
-        *(float4*)(B_shared_ptr + (ax0_ax1_fused_0_1 * 256)) =                 // ax0_ax1_fused_0_1 * elements loaded in each loop
-              *(float4*)(B_ptr + ((k_0 * 32) + (ax0_ax1_fused_0_1 * 16)) * N); 
-
+        *(float4 *)(B_shared_ptr + (ax0_ax1_fused_0_1 * 256)) = // ax0_ax1_fused_0_1 * elements loaded in each loop
+            *(float4 *)(B_ptr + ((k_0 * 32) + (ax0_ax1_fused_0_1 * 16)) * N);
       }
 
       __syncthreads();
-      #pragma unroll
-      for (int k_1 = 0; k_1 < ( 32 / 4); ++k_1) 
+#pragma unroll
+      for (int k_1 = 0; k_1 < (32 / 4); ++k_1)
       {
-        #pragma unroll
-        for (int k_2 = 0; k_2 < 4; ++k_2) 
+#pragma unroll
+        for (int k_2 = 0; k_2 < 4; ++k_2)
         {
           int vk_in_block = (k_1 << 2) + k_2;
-          #pragma unroll
-          for (int i = 0; i < 32; ++i) 
+#pragma unroll
+          for (int i = 0; i < 32; ++i)
           {
-            C_local[i] = C_local[i] + 
-                            A_shared_reduce_ptr[((i / 4) * 16) * 32 + vk_in_block] 
-                            * B_shared_reduce_ptr[(vk_in_block * 16) + ((i % 4) * 4)];
-
+            C_local[i] = C_local[i] +
+                         A_shared_reduce_ptr[((i / 4) * 16) * 32 + vk_in_block] * B_shared_reduce_ptr[(vk_in_block * 16) + ((i % 4) * 4)];
           }
         }
       }
     }
   }
 
-  #pragma unroll
-  for (int i = 0; i < 32; ++i) 
+#pragma unroll
+  for (int i = 0; i < 32; ++i)
   {
-      int location_cur = location_offset + ((i / 4) * 16);
-      int vn = C_n_offset + ((i % 4) * 4); 
-      if (location_cur < M)
-        C[location_cur * N + vn] = C_local[i];
-   }
+    int location_cur = location_offset + ((i / 4) * 16);
+    int vn = C_n_offset + ((i % 4) * 4);
+    if (location_cur < M)
+      C[location_cur * N + vn] = C_local[i];
+  }
 }
 
-// conv_forward_cuda_m128n64k32_f32f32f32
-__global__ void __launch_bounds__(128) conv_forward_cuda_setting3_mode0_f32f32f32(int M, int K_original, int N, int kernel_volume, float* __restrict__ A, float* __restrict__ B, int* __restrict__ out_in_map, float* __restrict__ C) 
+// conv_forward_cuda_m128n64k32_f32f32f32 // M = N_PNTS K_original= Cin N=Cout, A=in_feats, B=kernel, C=out_feats
+__global__ void __launch_bounds__(128) conv_forward_cuda_setting3_mode0_f32f32f32(int M, int K_original, int N, int kernel_volume, float *__restrict__ A, float *__restrict__ B, int *__restrict__ out_in_map, float *__restrict__ C)
 {
   float C_local[64];
   __shared__ float A_shared[4096];
   __shared__ float B_shared[2048];
 
-  #pragma unroll
-  for (int i = 0; i < 64; ++i)   
+#pragma unroll
+  for (int i = 0; i < 64; ++i)
   {
     C_local[i] = 0.0;
   }
-  
+
   int K_loops = (K_original * kernel_volume - 1) / 32 + 1;
-  int block_num_n = (N - 1) / 64 + 1; 
+  int block_num_n = (N - 1) / 64 + 1;
   int blockIdx_m = (int)blockIdx.x / block_num_n;
   int blockIdx_n = (int)blockIdx.x % block_num_n;
   int threadIdx_x = (int)threadIdx.x;
 
   // hoisting shared pointer offsets
-  int * out_in_map_ptr = out_in_map 
-                         + (blockIdx_m * 128 + (threadIdx_x / (32/4)))* kernel_volume;  
+  int *out_in_map_ptr = out_in_map + (blockIdx_m * 128 + (threadIdx_x / (32 / 4))) * kernel_volume;
 
-  float * B_ptr = B 
-                  + (threadIdx_x / (64/4)) * N 
-                  + (blockIdx_n * 64) + ((threadIdx_x * 4) % 64); 
+  float *B_ptr = B + (threadIdx_x / (64 / 4)) * N + (blockIdx_n * 64) + ((threadIdx_x * 4) % 64);
 
-  float * A_shared_ptr = A_shared + (threadIdx_x * 4);
-  float * A_shared_reduce_ptr =  A_shared + ((threadIdx_x / 16) * 32); 
-  float * B_shared_ptr = B_shared + (threadIdx_x * 4);
-  float * B_shared_reduce_ptr = B_shared + (threadIdx_x % 16);
+  float *A_shared_ptr = A_shared + (threadIdx_x * 4);
+  float *A_shared_reduce_ptr = A_shared + ((threadIdx_x / 16) * 32);
+  float *B_shared_ptr = B_shared + (threadIdx_x * 4);
+  float *B_shared_reduce_ptr = B_shared + (threadIdx_x % 16);
 
-  // float * C_ptr = C 
-                      // // + (blockIdx_m * 128 + (threadIdx_x / 16)) * N
-                      // + blockIdx_n * 64 + (threadIdx_x % 16);
-  int location_offset = blockIdx_m * 128 + (threadIdx_x / 16);  // C_m_offset
-  int C_n_offset = blockIdx_n * 64  + (threadIdx_x % 16);
+  // float * C_ptr = C
+  // // + (blockIdx_m * 128 + (threadIdx_x / 16)) * N
+  // + blockIdx_n * 64 + (threadIdx_x % 16);
+  int location_offset = blockIdx_m * 128 + (threadIdx_x / 16); // C_m_offset
+  int C_n_offset = blockIdx_n * 64 + (threadIdx_x % 16);
 
   int channel_offset_A = ((threadIdx_x * 4) % 32); // mod K_tile=32
 
-  #pragma unroll
-  for (int k_0 = 0; k_0 < K_loops; ++k_0) {
+#pragma unroll
+  for (int k_0 = 0; k_0 < K_loops; ++k_0)
+  {
 
-    int channel_offset = k_0 % (K_original / 32) * 32 + channel_offset_A; 
+    int channel_offset = k_0 % (K_original / 32) * 32 + channel_offset_A;
     int kernel_offset = k_0 / (K_original / 32);
     int *out_in_map_ptr_k = out_in_map_ptr + kernel_offset;
 
     {
       __syncthreads();
-      #pragma unroll
+#pragma unroll
       for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 8; ++ax0_ax1_fused_0)
       {
 
-        int input_idx = *(out_in_map_ptr_k + (ax0_ax1_fused_0 *16) * kernel_volume); 
-        if (input_idx != -1) 
+        int input_idx = *(out_in_map_ptr_k + (ax0_ax1_fused_0 * 16) * kernel_volume);
+        if (input_idx != -1)
         {
 
-          *(float4*)(A_shared_ptr + (ax0_ax1_fused_0 * 512)) =  // ax0_ax1_fused_0 * elements loaded in each loop
-              *(float4*)(A + (input_idx * K_original) + channel_offset);
-
+          *(float4 *)(A_shared_ptr + (ax0_ax1_fused_0 * 512)) = // ax0_ax1_fused_0 * elements loaded in each loop
+              *(float4 *)(A + (input_idx * K_original) + channel_offset);
         }
-        else {
+        else
+        {
 
-          *(float4*)(A_shared_ptr + (ax0_ax1_fused_0 * 512)) = make_float4(0.0, 0.0, 0.0, 0.0);
-
+          *(float4 *)(A_shared_ptr + (ax0_ax1_fused_0 * 512)) = make_float4(0.0, 0.0, 0.0, 0.0);
         }
       }
 
-      #pragma unroll
-      for (int ax0_ax1_fused_0_1 = 0; ax0_ax1_fused_0_1 < 4; ++ax0_ax1_fused_0_1)    
+#pragma unroll
+      for (int ax0_ax1_fused_0_1 = 0; ax0_ax1_fused_0_1 < 4; ++ax0_ax1_fused_0_1)
       {
 
-        *(float4*)(B_shared_ptr + (ax0_ax1_fused_0_1 * 512)) =                 // ax0_ax1_fused_0_1 * elements loaded in each loop
-              *(float4*)(B_ptr + ((k_0 * 32) + (ax0_ax1_fused_0_1 * 8)) * N); 
-
+        *(float4 *)(B_shared_ptr + (ax0_ax1_fused_0_1 * 512)) = // ax0_ax1_fused_0_1 * elements loaded in each loop
+            *(float4 *)(B_ptr + ((k_0 * 32) + (ax0_ax1_fused_0_1 * 8)) * N);
       }
 
       __syncthreads();
-      #pragma unroll
-      for (int k_1 = 0; k_1 < ( 32 / 4); ++k_1) 
+#pragma unroll
+      for (int k_1 = 0; k_1 < (32 / 4); ++k_1)
       {
-        #pragma unroll
-        for (int k_2 = 0; k_2 < 4; ++k_2) 
+#pragma unroll
+        for (int k_2 = 0; k_2 < 4; ++k_2)
         {
           int vk_in_block = (k_1 << 2) + k_2;
-          #pragma unroll
-          for (int i = 0; i < 64; ++i) 
+#pragma unroll
+          for (int i = 0; i < 64; ++i)
           {
-            C_local[i] = C_local[i] + 
-                            A_shared_reduce_ptr[((i / 4) * 8) * 32 + vk_in_block] 
-                            * B_shared_reduce_ptr[(vk_in_block * 64) + ((i % 4) * 16)];
-
+            C_local[i] = C_local[i] +
+                         A_shared_reduce_ptr[((i / 4) * 8) * 32 + vk_in_block] * B_shared_reduce_ptr[(vk_in_block * 64) + ((i % 4) * 16)];
           }
         }
       }
     }
   }
 
-  #pragma unroll
-  for (int i = 0; i < 64; ++i) 
+#pragma unroll
+  for (int i = 0; i < 64; ++i)
   {
-      int location_cur = location_offset + ((i / 4) * 8);
-      int vn = C_n_offset + ((i % 4) * 16); 
-      if (location_cur < M)
-        C[location_cur * N + vn] = C_local[i];
-   }
+    int location_cur = location_offset + ((i / 4) * 8);
+    int vn = C_n_offset + ((i % 4) * 16);
+    if (location_cur < M)
+      C[location_cur * N + vn] = C_local[i];
+  }
 }
 
 at::Tensor conv_forward_implicit_gemm_cuda(
@@ -1855,9 +1836,9 @@ at::Tensor conv_forward_implicit_gemm_cuda(
       }
     }
   }
-  else  // fp32fp32fp32
+  else // fp32fp32fp32
   {
-    // printf("\n Run FP32 kernel! \n"); 
+    // printf("\n Run FP32 kernel! \n");
     auto in_feats = _in_feats.data_ptr<float>();
     auto kernel = _kernel.data_ptr<float>();
     auto out_feats = _out_feats.data_ptr<float>();
@@ -1865,8 +1846,8 @@ at::Tensor conv_forward_implicit_gemm_cuda(
     if (num_out_channels % 64 == 0 && num_in_channels % 32 == 0)
     {
       int block_num_M = (num_out_feats + 127) / 128;
-      int block_num_N = num_out_channels / 64;  //j_factors1
-      dim3 num_blocks(block_num_M * block_num_N); 
+      int block_num_N = num_out_channels / 64; // j_factors1
+      dim3 num_blocks(block_num_M * block_num_N);
       dim3 threads_per_block(128);
       conv_forward_cuda_setting3_mode0_f32f32f32<<<num_blocks, threads_per_block>>>(
           _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume, in_feats, kernel, out_in_map, out_feats);
@@ -1874,8 +1855,8 @@ at::Tensor conv_forward_implicit_gemm_cuda(
     else if (num_in_channels % 32 == 0 && num_out_channels % 16 == 0)
     {
       int block_num_M = (num_out_feats + 127) / 128;
-      int block_num_N = num_out_channels / 16;  //j_factors1
-      dim3 num_blocks(block_num_M * block_num_N); 
+      int block_num_N = num_out_channels / 16; // j_factors1
+      dim3 num_blocks(block_num_M * block_num_N);
       dim3 threads_per_block(64);
       conv_forward_cuda_setting2_mode0_f32f32f32<<<num_blocks, threads_per_block>>>(
           _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume, in_feats, kernel, out_in_map, out_feats);
@@ -1883,8 +1864,8 @@ at::Tensor conv_forward_implicit_gemm_cuda(
     else
     {
       int block_num_M = (num_out_feats + 127) / 128;
-      int block_num_N = (num_out_channels + 15) / 16;  //j_factors1
-      dim3 num_blocks(block_num_M * block_num_N); 
+      int block_num_N = (num_out_channels + 15) / 16; // j_factors1
+      dim3 num_blocks(block_num_M * block_num_N);
       dim3 threads_per_block(64);
       // conv_forward_cuda_setting1_mode0_tf32tf32f32<<<num_blocks, threads_per_block>>>(
       //     _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume, in_feats, kernel, out_in_map, out_feats);

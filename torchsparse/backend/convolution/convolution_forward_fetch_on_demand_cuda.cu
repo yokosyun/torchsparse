@@ -20,7 +20,6 @@ Please consider citing the following paper when using the code:
 #include <cuda/pipeline>
 #endif
 
-
 #include "convolution_forward_fetch_on_demand_cuda.h"
 
 #define DIV_UP(x, y) ((x) + (y) - 1) / (y)
@@ -28,44 +27,53 @@ Please consider citing the following paper when using the code:
 // kernels employed in PCEngine [Fetch-on-Demand]
 // device function to indicate the weight index in fetch-on-demand gemms
 __device__ __forceinline__ int binary_search(
-                            const int *S_csrRowPtr, const int eid, 
-                            const int start, const int end) {
-    
+    const int *S_csrRowPtr, const int eid,
+    const int start, const int end)
+{
+
   int lo = start, hi = end;
-  if (lo == hi){
+  if (lo == hi)
+  {
     return lo;
   }
-  while (lo < hi) {
+  while (lo < hi)
+  {
     int mid = (lo + hi) >> 1;
-    if (__ldg(S_csrRowPtr + mid) <= eid) {
-        lo = mid + 1;
-    } else {
-        hi = mid;
+    if (__ldg(S_csrRowPtr + mid) <= eid)
+    {
+      lo = mid + 1;
+    }
+    else
+    {
+      hi = mid;
     }
   }
-  if (__ldg(S_csrRowPtr + hi) <= eid) {
+  if (__ldg(S_csrRowPtr + hi) <= eid)
+  {
     return hi;
-  } else {
-      return hi - 1;
+  }
+  else
+  {
+    return hi - 1;
   }
 }
-
 
 /*
 BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, blockDim.x = 8, blockDim.y = 32
 */
 template <int BLOCK_SIZE, int N_LOOP, int SKEW>
 __global__ void fetch_on_demand_gemm_fp32(
-                const int *__restrict__ kpos,
-                const int *__restrict__ qkpos, 
-                const int k_vol, 
-                const int c_in,
-                const int c_out,
-                const float *__restrict__ in_f, 
-                const float *__restrict__ kw, 
-                float *out_f,
-                const int *imap, 
-                const int *omap) {
+    const int *__restrict__ kpos,
+    const int *__restrict__ qkpos,
+    const int k_vol,
+    const int c_in,
+    const int c_out,
+    const float *__restrict__ in_f,
+    const float *__restrict__ kw,
+    float *out_f,
+    const int *imap,
+    const int *omap)
+{
 
   // Block index
   const int bx = blockIdx.x;
@@ -82,8 +90,7 @@ __global__ void fetch_on_demand_gemm_fp32(
 
   // Coordinate. x is for rows, y is for columns.
   const int cx = BLOCK_SIZE * bx + ctx;
-  const int y = BLOCK_SIZE * N_LOOP * by + ty 
-    - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
+  const int y = BLOCK_SIZE * N_LOOP * by + ty - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
 
   // Csub is used to store the element of the block sub-matrix
   // that is computed by the thread
@@ -97,31 +104,31 @@ __global__ void fetch_on_demand_gemm_fp32(
   // Declaration of the shared memory array Bs used to
   // store the sub-matrix of B
   __shared__ float Bs[BLOCK_SIZE][BLOCK_SIZE + SKEW];
-  
+
+  // printf("BLOCK_SIZE=%d: SKEW= %d : ctx= %d \n", BLOCK_SIZE, SKEW, ctx);
+
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
 
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    *((float4*)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? 
-      *((float4*)(kw_ptr + c_out * (s + ty) + cx)) : 
-      *((float4*)(&padding[0]));
-    
+    *((float4 *)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? *((float4 *)(kw_ptr + c_out * (s + ty) + cx)) : *((float4 *)(&padding[0]));
+
     // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    for (int n = 0; n < N_LOOP; n++)
+    {
 
       int y_temp = y + n * BLOCK_SIZE;
 
       // The thread deals with the x-th channel of the y-th output
       int in_row = y_temp < __ldg(&kpos[widx + 1]) ? imap[y_temp] : -1;
 
-      *((float4*)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? 
-        *((float4*)(&in_f[c_in * in_row + s + ctx])) : 
-        *((float4*)(&padding[0]));
+      *((float4 *)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? *((float4 *)(&in_f[c_in * in_row + s + ctx])) : *((float4 *)(&padding[0]));
     }
 
     // Synchronize to make sure the matrices are loaded
@@ -130,13 +137,16 @@ __global__ void fetch_on_demand_gemm_fp32(
     // Multiply the two matrices together;
     // each thread computes one element
     // of the block sub-matrix
-#pragma unroll 
-    for (int n = 0; n < N_LOOP; n++){
 #pragma unroll
-      for (int k = 0; k < BLOCK_SIZE; ++k) {
+    for (int n = 0; n < N_LOOP; n++)
+    {
+#pragma unroll
+      for (int k = 0; k < BLOCK_SIZE; ++k)
+      {
         float Ast = As[n][ty][k];
 #pragma unroll
-        for (int c = 0; c < 4; c++){
+        for (int c = 0; c < 4; c++)
+        {
           Csub[n][c] += Ast * Bs[k][ctx + c];
         }
       }
@@ -151,32 +161,35 @@ __global__ void fetch_on_demand_gemm_fp32(
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < __ldg(&kpos[widx + 1]) ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
 #pragma unroll
-      for (int c = 0; c < 4; c++){
+      for (int c = 0; c < 4; c++)
+      {
         atomicAdd(&out_f[c_out * out_row + cx + c], Csub[n][c]);
       }
     }
   }
 }
 
-
 /*
 BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, blockDim.x = 8, blockDim.y = 32
 */
 template <int BLOCK_SIZE, int N_LOOP, int SKEW>
 __global__ void fetch_on_demand_gemm_no_fusion_fp32(
-                const int knnz,
-                const int c_in,
-                const int c_out,
-                const float *__restrict__ in_f, 
-                const float *__restrict__ kw, 
-                float *out_f,
-                const int *imap, 
-                const int *omap) {
+    const int knnz,
+    const int c_in,
+    const int c_out,
+    const float *__restrict__ in_f,
+    const float *__restrict__ kw,
+    float *out_f,
+    const int *imap,
+    const int *omap)
+{
 
   // Block index
   const int bx = blockIdx.x;
@@ -208,31 +221,34 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp32(
   // Declaration of the shared memory array Bs used to
   // store the sub-matrix of B
   __shared__ float Bs[BLOCK_SIZE][BLOCK_SIZE + SKEW];
-  
+
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
 
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    *((float4*)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? 
-      *((float4*)(kw_ptr + c_out * (s + ty) + cx)) : 
-      *((float4*)(&padding[0]));
-    
+    *((float4 *)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? *((float4 *)(kw_ptr + c_out * (s + ty) + cx)) : *((float4 *)(&padding[0]));
+
     // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    for (int n = 0; n < N_LOOP; n++)
+    {
 
       int y_temp = y + n * BLOCK_SIZE;
+
+      // if (y_temp >= knnz)
+      // {
+      //   printf("y_temp %d, knnz %d \n", y_temp, knnz);
+      // }
 
       // The thread deals with the x-th channel of the y-th output
       int in_row = y_temp < knnz ? imap[y_temp] : -1;
 
-      *((float4*)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? 
-        *((float4*)(&in_f[c_in * in_row + s + ctx])) : 
-        *((float4*)(&padding[0]));
+      *((float4 *)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? *((float4 *)(&in_f[c_in * in_row + s + ctx])) : *((float4 *)(&padding[0]));
     }
 
     // Synchronize to make sure the matrices are loaded
@@ -241,13 +257,16 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp32(
     // Multiply the two matrices together;
     // each thread computes one element
     // of the block sub-matrix
-#pragma unroll 
-    for (int n = 0; n < N_LOOP; n++){
 #pragma unroll
-      for (int k = 0; k < BLOCK_SIZE; ++k) {
+    for (int n = 0; n < N_LOOP; n++)
+    {
+#pragma unroll
+      for (int k = 0; k < BLOCK_SIZE; ++k)
+      {
         float Ast = As[n][ty][k];
 #pragma unroll
-        for (int c = 0; c < 4; c++){
+        for (int c = 0; c < 4; c++)
+        {
           Csub[n][c] += Ast * Bs[k][ctx + c];
         }
       }
@@ -262,67 +281,71 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp32(
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < knnz ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
 #pragma unroll
-      for (int c = 0; c < 4; c++){
+      for (int c = 0; c < 4; c++)
+      {
         // atomicAdd(&out_f[c_out * out_row + cx + c], Csub[n][c]);
+        // cx + c = channel
+        // c_out * out_row = points
         out_f[c_out * out_row + cx + c] += Csub[n][c];
       }
     }
   }
 }
 
-
 /*
-BLOCK_SIZE = 16, N_LOOP = 8, SKEW = 8, blockDim.x = 4, blockDim.y = 16
+BLOCK_SIZE = 16, N_LOOP = 4, SKEW = 8, blockDim.x = 4, blockDim.y = 16
 */
 template <int BLOCK_SIZE, int N_LOOP, int SKEW>
 __global__ void fetch_on_demand_gemm_fp32_once(
-                const int *__restrict__ kpos,
-                const int *__restrict__ qkpos, 
-                const int k_vol, 
-                const int c_in,
-                const int c_out,
-                const float *__restrict__ in_f, 
-                const float *__restrict__ kw, 
-                float *out_f,
-                const int *imap, 
-                const int *omap) {
+    const int *__restrict__ kpos,
+    const int *__restrict__ qkpos,
+    const int k_vol,
+    const int c_in,
+    const int c_out,
+    const float *__restrict__ in_f,
+    const float *__restrict__ kw,
+    float *out_f,
+    const int *imap,
+    const int *omap)
+{
 
   // Block index
   const int bx = blockIdx.x;
   const int by = blockIdx.y;
 
   // Thread index
-  const int tx = threadIdx.x;
-  const int ty = threadIdx.y;
-  const int ctx = tx << 2;
+  const int tx = threadIdx.x; //  0 ~ 3
+  const int ty = threadIdx.y; // 0 ~ 15
+  const int ctx = tx << 2;    // 0,4,8,12
 
   // Weight index
   const int widx = binary_search(qkpos, by * N_LOOP * BLOCK_SIZE, 0, k_vol);
   const float *kw_ptr = &kw[widx * c_in * c_out];
 
   // Coordinate. x is for rows, y is for columns.
-  const int cx = BLOCK_SIZE * bx + ctx;
-  const int y = BLOCK_SIZE * N_LOOP * by + ty 
-    - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
+  const int cx = BLOCK_SIZE * bx + ctx;                                                   // C_out
+  const int y = BLOCK_SIZE * N_LOOP * by + ty - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]); // points
 
   // Csub is used to store the element of the block sub-matrix
   // that is computed by the thread
-  float Csub[N_LOOP][4] = {0.0f};
-  float padding[4] = {0.0f};
+  float Csub[N_LOOP][4] = {0.0f}; // [N_PNTS, C_out] Nvidia L1 cache line size = 128bytes = 32bytes * 4
+  float padding[4] = {0.0f};      // [C_out]
 
   // Declaration of the shared memory array As used to
   // store the sub-matrix of A
-  __shared__ float As[N_LOOP][BLOCK_SIZE][BLOCK_SIZE + SKEW];
+  __shared__ float As[N_LOOP][BLOCK_SIZE][BLOCK_SIZE + SKEW]; //[N_PNTS, C_in, C_out]
 
   // Declaration of the shared memory array Bs used to
   // store the sub-matrix of B
-  __shared__ float Bs[BLOCK_SIZE][BLOCK_SIZE + SKEW];
-  
+  __shared__ float Bs[BLOCK_SIZE][BLOCK_SIZE + SKEW]; // [C_in, C_out]
+
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
   // In "loop once" version, s = 0
@@ -333,21 +356,18 @@ __global__ void fetch_on_demand_gemm_fp32_once(
   // one element of each matrix
 
   // Kernel weight to Bs
-  *((float4*)(&Bs[ty][ctx])) = ((ty) < c_in && cx < c_out) ? 
-    *((float4*)(kw_ptr + c_out * (ty) + cx)) : 
-    *((float4*)(&padding[0]));
-    
+  *((float4 *)(&Bs[ty][ctx])) = ((ty) < c_in && cx < c_out) ? *((float4 *)(kw_ptr + c_out * (ty) + cx)) : *((float4 *)(&padding[0]));
+
   // Input feature to As
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
 
     int y_temp = y + n * BLOCK_SIZE;
 
     // The thread deals with the x-th channel of the y-th output
     int in_row = y_temp < __ldg(&kpos[widx + 1]) ? imap[y_temp] : -1;
 
-    *((float4*)(&As[n][ty][ctx])) = ((ctx) < c_in && in_row > -1) ? 
-      *((float4*)(&in_f[c_in * in_row + ctx])) : 
-      *((float4*)(&padding[0]));
+    *((float4 *)(&As[n][ty][ctx])) = ((ctx) < c_in && in_row > -1) ? *((float4 *)(&in_f[c_in * in_row + ctx])) : *((float4 *)(&padding[0]));
   }
 
   // Synchronize to make sure the matrices are loaded
@@ -356,21 +376,26 @@ __global__ void fetch_on_demand_gemm_fp32_once(
   // Multiply the two matrices together;
   // each thread computes one element
   // of the block sub-matrix
-#pragma unroll 
-  for (int n = 0; n < N_LOOP; n++){
 #pragma unroll
-    for (int k = 0; k < c_in; ++k) {
+  for (int n = 0; n < N_LOOP; n++) // N_PNTS
+  {
+#pragma unroll
+    for (int k = 0; k < c_in; ++k) // C_in
+    {
       float Ast = As[n][ty][k];
 #pragma unroll
-      for (int c = 0; c < 4; c++){
+      for (int c = 0; c < 4; c++) // 4 out channel
+      {
         Csub[n][c] += Ast * Bs[k][ctx + c];
       }
     }
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < __ldg(&kpos[widx + 1]) ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
 #pragma unroll
-      for (int c = 0; c < 4; c++){
+      for (int c = 0; c < 4; c++) // 4 out channel
+      {
         atomicAdd(&out_f[c_out * out_row + cx + c], Csub[n][c]);
       }
     }
@@ -378,21 +403,22 @@ __global__ void fetch_on_demand_gemm_fp32_once(
 }
 
 /*
-BLOCK_SIZE = 16, N_LOOP = 8, SKEW = 8, 
+BLOCK_SIZE = 16, N_LOOP = 8, SKEW = 8,
 blockDim.x = 8, blockDim.y = 16
 */
 template <int BLOCK_SIZE, int N_LOOP, int SKEW>
 __global__ void fetch_on_demand_gemm_fp32_2(
-                const int *__restrict__ kpos,
-                const int *__restrict__ qkpos, 
-                const int k_vol, 
-                const int c_in,
-                const int c_out,
-                const float *__restrict__ in_f, 
-                const float *__restrict__ kw, 
-                float *out_f,
-                const int *imap, 
-                const int *omap) {
+    const int *__restrict__ kpos,
+    const int *__restrict__ qkpos,
+    const int k_vol,
+    const int c_in,
+    const int c_out,
+    const float *__restrict__ in_f,
+    const float *__restrict__ kw,
+    float *out_f,
+    const int *imap,
+    const int *omap)
+{
 
   // Block index
   const int bx = blockIdx.x;
@@ -409,8 +435,7 @@ __global__ void fetch_on_demand_gemm_fp32_2(
 
   // Coordinate. x is for rows, y is for columns.
   const int cx = BLOCK_SIZE * bx + ctx;
-  const int y = BLOCK_SIZE * N_LOOP * by + ty 
-    - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
+  const int y = BLOCK_SIZE * N_LOOP * by + ty - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
 
   // Csub is used to store the element of the block sub-matrix
   // that is computed by the thread
@@ -424,31 +449,29 @@ __global__ void fetch_on_demand_gemm_fp32_2(
   // Declaration of the shared memory array Bs used to
   // store the sub-matrix of B
   __shared__ float Bs[BLOCK_SIZE][BLOCK_SIZE + SKEW];
-  
+
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
 
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    *((float2*)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? 
-      *((float2*)(kw_ptr + c_out * (s + ty) + cx)) : 
-      *((float2*)(&padding[0]));
-    
+    *((float2 *)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? *((float2 *)(kw_ptr + c_out * (s + ty) + cx)) : *((float2 *)(&padding[0]));
+
     // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    for (int n = 0; n < N_LOOP; n++)
+    {
 
       int y_temp = y + n * BLOCK_SIZE;
 
       // The thread deals with the x-th channel of the y-th output
       int in_row = y_temp < __ldg(&kpos[widx + 1]) ? imap[y_temp] : -1;
 
-      *((float2*)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? 
-        *((float2*)(&in_f[c_in * in_row + s + ctx])) : 
-        *((float2*)(&padding[0]));
+      *((float2 *)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? *((float2 *)(&in_f[c_in * in_row + s + ctx])) : *((float2 *)(&padding[0]));
     }
 
     // Synchronize to make sure the matrices are loaded
@@ -457,13 +480,16 @@ __global__ void fetch_on_demand_gemm_fp32_2(
     // Multiply the two matrices together;
     // each thread computes one element
     // of the block sub-matrix
-#pragma unroll 
-    for (int n = 0; n < N_LOOP; n++){
 #pragma unroll
-      for (int k = 0; k < BLOCK_SIZE; ++k) {
+    for (int n = 0; n < N_LOOP; n++)
+    {
+#pragma unroll
+      for (int k = 0; k < BLOCK_SIZE; ++k)
+      {
         float Ast = As[n][ty][k];
 #pragma unroll
-        for (int c = 0; c < 2; c++){
+        for (int c = 0; c < 2; c++)
+        {
           Csub[n][c] += Ast * Bs[k][ctx + c];
         }
       }
@@ -478,35 +504,38 @@ __global__ void fetch_on_demand_gemm_fp32_2(
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < __ldg(&kpos[widx + 1]) ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
 #pragma unroll
-      for (int c = 0; c < 2; c++){
+      for (int c = 0; c < 2; c++)
+      {
         atomicAdd(&out_f[c_out * out_row + cx + c], Csub[n][c]);
       }
     }
   }
 }
 
-
 /*
-BLOCK_SIZE = 16, N_LOOP = 4, SKEW = 8, 
+BLOCK_SIZE = 16, N_LOOP = 4, SKEW = 8,
 blockDim.x = 16, blockDim.y = 16
 */
 template <int BLOCK_SIZE, int N_LOOP, int SKEW>
 __global__ void fetch_on_demand_gemm_fp32_1(
-                const int *__restrict__ kpos,
-                const int *__restrict__ qkpos, 
-                const int k_vol, 
-                const int c_in,
-                const int c_out,
-                const float *__restrict__ in_f, 
-                const float *__restrict__ kw, 
-                float *out_f,
-                const int *imap, 
-                const int *omap) {
+    const int *__restrict__ kpos,
+    const int *__restrict__ qkpos,
+    const int k_vol,
+    const int c_in,
+    const int c_out,
+    const float *__restrict__ in_f,
+    const float *__restrict__ kw,
+    float *out_f,
+    const int *imap,
+    const int *omap)
+{
 
   // Block index
   const int bx = blockIdx.x;
@@ -523,8 +552,7 @@ __global__ void fetch_on_demand_gemm_fp32_1(
 
   // Coordinate. x is for rows, y is for columns.
   const int cx = BLOCK_SIZE * bx + tx;
-  const int y = BLOCK_SIZE * N_LOOP * by + ty 
-    - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
+  const int y = BLOCK_SIZE * N_LOOP * by + ty - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
 
   // Csub is used to store the element of the block sub-matrix
   // that is computed by the thread
@@ -538,31 +566,29 @@ __global__ void fetch_on_demand_gemm_fp32_1(
   // Declaration of the shared memory array Bs used to
   // store the sub-matrix of B
   __shared__ float Bs[BLOCK_SIZE][BLOCK_SIZE + SKEW];
-  
+
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
 
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    Bs[ty][tx] = ((s + ty) < c_in && cx < c_out) ? 
-      *(kw_ptr + c_out * (s + ty) + cx) : 
-      padding;
-    
+    Bs[ty][tx] = ((s + ty) < c_in && cx < c_out) ? *(kw_ptr + c_out * (s + ty) + cx) : padding;
+
     // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    for (int n = 0; n < N_LOOP; n++)
+    {
 
       int y_temp = y + n * BLOCK_SIZE;
 
       // The thread deals with the x-th channel of the y-th output
       int in_row = y_temp < __ldg(&kpos[widx + 1]) ? imap[y_temp] : -1;
 
-      As[n][ty][tx] = ((s + tx) < c_in && in_row > -1) ? 
-        in_f[c_in * in_row + s + tx] : 
-        padding;
+      As[n][ty][tx] = ((s + tx) < c_in && in_row > -1) ? in_f[c_in * in_row + s + tx] : padding;
     }
 
     // Synchronize to make sure the matrices are loaded
@@ -571,10 +597,12 @@ __global__ void fetch_on_demand_gemm_fp32_1(
     // Multiply the two matrices together;
     // each thread computes one element
     // of the block sub-matrix
-#pragma unroll 
-    for (int n = 0; n < N_LOOP; n++){
 #pragma unroll
-      for (int k = 0; k < BLOCK_SIZE; ++k) {
+    for (int n = 0; n < N_LOOP; n++)
+    {
+#pragma unroll
+      for (int k = 0; k < BLOCK_SIZE; ++k)
+      {
         // float Ast = As[n][ty][k];
         // for (int c = 0; c < 2; c++){
         Csub[n] += As[n][ty][k] * Bs[k][tx];
@@ -591,10 +619,12 @@ __global__ void fetch_on_demand_gemm_fp32_1(
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < __ldg(&kpos[widx + 1]) ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
       // for (int c = 0; c < 2; c++){
       atomicAdd(&out_f[c_out * out_row + cx], Csub[n]);
       // }
@@ -602,21 +632,21 @@ __global__ void fetch_on_demand_gemm_fp32_1(
   }
 }
 
-
 /*
-BLOCK_SIZE = 16, N_LOOP = 4, SKEW = 8, 
+BLOCK_SIZE = 16, N_LOOP = 4, SKEW = 8,
 blockDim.x = 16, blockDim.y = 16
 */
 template <int BLOCK_SIZE, int N_LOOP, int SKEW>
 __global__ void fetch_on_demand_gemm_no_fusion_fp32_1(
-                const int knnz,
-                const int c_in,
-                const int c_out,
-                const float *__restrict__ in_f, 
-                const float *__restrict__ kw, 
-                float *out_f,
-                const int *imap, 
-                const int *omap) {
+    const int knnz,
+    const int c_in,
+    const int c_out,
+    const float *__restrict__ in_f,
+    const float *__restrict__ kw,
+    float *out_f,
+    const int *imap,
+    const int *omap)
+{
 
   // Block index
   const int bx = blockIdx.x;
@@ -632,8 +662,8 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp32_1(
   const float *kw_ptr = &kw[0];
 
   // Coordinate. x is for rows, y is for columns.
-  const int cx = BLOCK_SIZE * bx + tx;
-  const int y = BLOCK_SIZE * N_LOOP * by + ty;
+  const int cx = BLOCK_SIZE * bx + tx;         // block_size * block_idx + thread_idx
+  const int y = BLOCK_SIZE * N_LOOP * by + ty; // block_size * block_idx * n_loop + thread_idx
 
   // Csub is used to store the element of the block sub-matrix
   // that is computed by the thread
@@ -647,31 +677,30 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp32_1(
   // Declaration of the shared memory array Bs used to
   // store the sub-matrix of B
   __shared__ float Bs[BLOCK_SIZE][BLOCK_SIZE + SKEW];
-  
+
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
 
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    Bs[ty][tx] = ((s + ty) < c_in && cx < c_out) ? 
-      *(kw_ptr + c_out * (s + ty) + cx) : 
-      padding;
-    
-    // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    Bs[ty][tx] = ((s + ty) < c_in && cx < c_out) ? *(kw_ptr + c_out * (s + ty) + cx) : padding;
 
-      int y_temp = y + n * BLOCK_SIZE;
+    // Input feature to As
+    for (int n = 0; n < N_LOOP; n++)
+    {
+
+      int y_temp = y + n * BLOCK_SIZE; // extract blcok
 
       // The thread deals with the x-th channel of the y-th output
+
       int in_row = y_temp < knnz ? imap[y_temp] : -1;
 
-      As[n][ty][tx] = ((s + tx) < c_in && in_row > -1) ? 
-        in_f[c_in * in_row + s + tx] : 
-        padding;
+      As[n][ty][tx] = ((s + tx) < c_in && in_row > -1) ? in_f[c_in * in_row + s + tx] : padding;
     }
 
     // Synchronize to make sure the matrices are loaded
@@ -680,10 +709,12 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp32_1(
     // Multiply the two matrices together;
     // each thread computes one element
     // of the block sub-matrix
-#pragma unroll 
-    for (int n = 0; n < N_LOOP; n++){
 #pragma unroll
-      for (int k = 0; k < BLOCK_SIZE; ++k) {
+    for (int n = 0; n < N_LOOP; n++)
+    {
+#pragma unroll
+      for (int k = 0; k < BLOCK_SIZE; ++k)
+      {
         // float Ast = As[n][ty][k];
         // for (int c = 0; c < 2; c++){
         Csub[n] += As[n][ty][k] * Bs[k][tx];
@@ -700,10 +731,12 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp32_1(
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < knnz ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
       // for (int c = 0; c < 2; c++){
       // atomicAdd(&out_f[c_out * out_row + cx], Csub[n]);
       out_f[c_out * out_row + cx] += Csub[n];
@@ -712,23 +745,23 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp32_1(
   }
 }
 
-
 /*
 BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, blockDim.x = 8, blockDim.y = 32
 */
 template <int BLOCK_SIZE, int N_LOOP, int SKEW>
 __global__ void fetch_on_demand_gemm_fp16_4_once(
-                const int *__restrict__ kpos,
-                const int *__restrict__ qkpos, 
-                const int k_vol, 
-                const int c_in,
-                const int c_out,
-                const half *__restrict__ in_f, 
-                const half *__restrict__ kw, 
-                half *out_f,
-                const int *imap, 
-                const int *omap) {
-# if __CUDA_ARCH__ >= 700
+    const int *__restrict__ kpos,
+    const int *__restrict__ qkpos,
+    const int k_vol,
+    const int c_in,
+    const int c_out,
+    const half *__restrict__ in_f,
+    const half *__restrict__ kw,
+    half *out_f,
+    const int *imap,
+    const int *omap)
+{
+#if __CUDA_ARCH__ >= 700
   // Block index
   const int bx = blockIdx.x;
   const int by = blockIdx.y;
@@ -744,8 +777,7 @@ __global__ void fetch_on_demand_gemm_fp16_4_once(
 
   // Coordinate. x is for rows, y is for columns.
   const int cx = BLOCK_SIZE * bx + ctx;
-  const int y = BLOCK_SIZE * N_LOOP * by + ty 
-    - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
+  const int y = BLOCK_SIZE * N_LOOP * by + ty - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
 
   // Csub is used to store the element of the block sub-matrix
   // that is computed by the thread
@@ -759,28 +791,25 @@ __global__ void fetch_on_demand_gemm_fp16_4_once(
   // Declaration of the shared memory array Bs used to
   // store the sub-matrix of B
   __shared__ half Bs[BLOCK_SIZE][BLOCK_SIZE + SKEW];
-  
+
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
   // In "loop once" version, s = 0
   // for (int s = 0; s < c_in; s += BLOCK_SIZE) {
 
   // Kernel weight to Bs
-  *((float2*)(&Bs[ty][ctx])) = (ty < c_in && cx < c_out) ? 
-    *((float2*)(kw_ptr + c_out * ty + cx)) : 
-    *((float2*)(&padding[0]));
-    
+  *((float2 *)(&Bs[ty][ctx])) = (ty < c_in && cx < c_out) ? *((float2 *)(kw_ptr + c_out * ty + cx)) : *((float2 *)(&padding[0]));
+
   int y_temp = y;
   // Input feature to As
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
 
     // The thread deals with the x-th channel of the y-th output
     int in_row = y_temp < __ldg(&kpos[widx + 1]) ? imap[y_temp] : -1;
 
-    *((float2*)(&As[n][ty][ctx])) = (ctx < c_in && in_row > -1) ? 
-      *((float2*)(&in_f[c_in * in_row + ctx])) : 
-      *((float2*)(&padding[0]));
-      
+    *((float2 *)(&As[n][ty][ctx])) = (ctx < c_in && in_row > -1) ? *((float2 *)(&in_f[c_in * in_row + ctx])) : *((float2 *)(&padding[0]));
+
     y_temp += BLOCK_SIZE;
   }
 
@@ -790,48 +819,53 @@ __global__ void fetch_on_demand_gemm_fp16_4_once(
   // Multiply the two matrices together;
   // each thread computes one element
   // of the block sub-matrix
-#pragma unroll 
-  for (int n = 0; n < N_LOOP; n++){
 #pragma unroll
-    for (int k = 0; k < c_in; ++k){
+  for (int n = 0; n < N_LOOP; n++)
+  {
+#pragma unroll
+    for (int k = 0; k < c_in; ++k)
+    {
       half Ast = As[n][ty][k];
 #pragma unroll
-      for (int c = 0; c < 4; c++){
+      for (int c = 0; c < 4; c++)
+      {
         Csub[n][c] = __hfma(Ast, Bs[k][ctx + c], Csub[n][c]);
       }
     }
 
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < __ldg(&kpos[widx + 1]) ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
 #pragma unroll
-      for (int c = 0; c < 4; c++){
+      for (int c = 0; c < 4; c++)
+      {
         atomicAdd(&out_f[c_out * out_row + cx + c], Csub[n][c]);
       }
     }
   }
 #else
-  #pragma message("FP16 kernels will not be compiled.")
+#pragma message("FP16 kernels will not be compiled.")
 #endif
 }
-
 
 /*
 BLOCK_SIZE = 16, N_LOOP = 8, SKEW = 8, blockDim.x = 8, blockDim.y = 16
 */
 template <int BLOCK_SIZE, int N_LOOP, int SKEW>
 __global__ void fetch_on_demand_gemm_fp16_2(
-                const int *__restrict__ kpos,
-                const int *__restrict__ qkpos, 
-                const int k_vol, 
-                const int c_in,
-                const int c_out,
-                const half *__restrict__ in_f, 
-                const half *__restrict__ kw, 
-                half *out_f,
-                const int *imap, 
-                const int *omap) {
-# if __CUDA_ARCH__ >= 700
+    const int *__restrict__ kpos,
+    const int *__restrict__ qkpos,
+    const int k_vol,
+    const int c_in,
+    const int c_out,
+    const half *__restrict__ in_f,
+    const half *__restrict__ kw,
+    half *out_f,
+    const int *imap,
+    const int *omap)
+{
+#if __CUDA_ARCH__ >= 700
   // Block index
   const int bx = blockIdx.x;
   const int by = blockIdx.y;
@@ -847,8 +881,7 @@ __global__ void fetch_on_demand_gemm_fp16_2(
 
   // Coordinate. x is for rows, y is for columns.
   const int cx = BLOCK_SIZE * bx + ctx;
-  const int y = BLOCK_SIZE * N_LOOP * by + ty 
-    - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
+  const int y = BLOCK_SIZE * N_LOOP * by + ty - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
 
   // Csub is used to store the element of the block sub-matrix
   // that is computed by the thread
@@ -862,31 +895,29 @@ __global__ void fetch_on_demand_gemm_fp16_2(
   // Declaration of the shared memory array Bs used to
   // store the sub-matrix of B
   __shared__ half Bs[BLOCK_SIZE][BLOCK_SIZE + SKEW];
-  
+
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
 
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    *((float*)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? 
-      *((float*)(kw_ptr + c_out * (s + ty) + cx)) : 
-      *((float*)(&padding[0]));
-    
+    *((float *)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? *((float *)(kw_ptr + c_out * (s + ty) + cx)) : *((float *)(&padding[0]));
+
     // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    for (int n = 0; n < N_LOOP; n++)
+    {
 
       int y_temp = y + n * BLOCK_SIZE;
 
       // The thread deals with the x-th channel of the y-th output
       int in_row = y_temp < __ldg(&kpos[widx + 1]) ? imap[y_temp] : -1;
 
-      *((float*)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? 
-        *((float*)(&in_f[c_in * in_row + s + ctx])) : 
-        *((float*)(&padding[0]));
+      *((float *)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? *((float *)(&in_f[c_in * in_row + s + ctx])) : *((float *)(&padding[0]));
     }
 
     // Synchronize to make sure the matrices are loaded
@@ -895,13 +926,16 @@ __global__ void fetch_on_demand_gemm_fp16_2(
     // Multiply the two matrices together;
     // each thread computes one element
     // of the block sub-matrix
-#pragma unroll 
-    for (int n = 0; n < N_LOOP; n++){
 #pragma unroll
-      for (int k = 0; k < BLOCK_SIZE; ++k) {
+    for (int n = 0; n < N_LOOP; n++)
+    {
+#pragma unroll
+      for (int k = 0; k < BLOCK_SIZE; ++k)
+      {
         half Ast = As[n][ty][k];
 #pragma unroll
-        for (int c = 0; c < 2; c++){
+        for (int c = 0; c < 2; c++)
+        {
           Csub[n][c] = __hfma(Ast, Bs[k][ctx + c], Csub[n][c]);
         }
       }
@@ -916,38 +950,41 @@ __global__ void fetch_on_demand_gemm_fp16_2(
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < __ldg(&kpos[widx + 1]) ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
 #pragma unroll
-      for (int c = 0; c < 2; c++){
+      for (int c = 0; c < 2; c++)
+      {
         atomicAdd(&out_f[c_out * out_row + cx + c], Csub[n][c]);
       }
     }
   }
 #else
-  #pragma message("TF32 kernels will not be compiled.")
+#pragma message("TF32 kernels will not be compiled.")
 #endif
 }
-
 
 /*
 BLOCK_SIZE = 16, N_LOOP = 4, SKEW = 8, blockDim.x = 16, blockDim.y = 16
 */
 template <int BLOCK_SIZE, int N_LOOP, int SKEW>
 __global__ void fetch_on_demand_gemm_fp16_1(
-                const int *__restrict__ kpos,
-                const int *__restrict__ qkpos, 
-                const int k_vol, 
-                const int c_in,
-                const int c_out,
-                const half *__restrict__ in_f, 
-                const half *__restrict__ kw, 
-                half *out_f,
-                const int *imap, 
-                const int *omap) {
-# if __CUDA_ARCH__ >= 700
+    const int *__restrict__ kpos,
+    const int *__restrict__ qkpos,
+    const int k_vol,
+    const int c_in,
+    const int c_out,
+    const half *__restrict__ in_f,
+    const half *__restrict__ kw,
+    half *out_f,
+    const int *imap,
+    const int *omap)
+{
+#if __CUDA_ARCH__ >= 700
   // Block index
   const int bx = blockIdx.x;
   const int by = blockIdx.y;
@@ -963,8 +1000,7 @@ __global__ void fetch_on_demand_gemm_fp16_1(
 
   // Coordinate. x is for rows, y is for columns.
   const int cx = BLOCK_SIZE * bx + tx;
-  const int y = BLOCK_SIZE * N_LOOP * by + ty 
-    - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
+  const int y = BLOCK_SIZE * N_LOOP * by + ty - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
 
   // Csub is used to store the element of the block sub-matrix
   // that is computed by the thread
@@ -978,31 +1014,29 @@ __global__ void fetch_on_demand_gemm_fp16_1(
   // Declaration of the shared memory array Bs used to
   // store the sub-matrix of B
   __shared__ half Bs[BLOCK_SIZE][BLOCK_SIZE + SKEW];
-  
+
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
 
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    Bs[ty][tx] = ((s + ty) < c_in && cx < c_out) ? 
-      *(kw_ptr + c_out * (s + ty) + cx) : 
-      padding;
-    
+    Bs[ty][tx] = ((s + ty) < c_in && cx < c_out) ? *(kw_ptr + c_out * (s + ty) + cx) : padding;
+
     // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    for (int n = 0; n < N_LOOP; n++)
+    {
 
       int y_temp = y + n * BLOCK_SIZE;
 
       // The thread deals with the x-th channel of the y-th output
       int in_row = y_temp < __ldg(&kpos[widx + 1]) ? imap[y_temp] : -1;
 
-      As[n][ty][tx] = ((s + tx) < c_in && in_row > -1) ? 
-        in_f[c_in * in_row + s + tx] : 
-        padding;
+      As[n][ty][tx] = ((s + tx) < c_in && in_row > -1) ? in_f[c_in * in_row + s + tx] : padding;
     }
 
     // Synchronize to make sure the matrices are loaded
@@ -1011,13 +1045,15 @@ __global__ void fetch_on_demand_gemm_fp16_1(
     // Multiply the two matrices together;
     // each thread computes one element
     // of the block sub-matrix
-#pragma unroll 
-    for (int n = 0; n < N_LOOP; n++){
 #pragma unroll
-      for (int k = 0; k < BLOCK_SIZE; ++k) {
+    for (int n = 0; n < N_LOOP; n++)
+    {
+#pragma unroll
+      for (int k = 0; k < BLOCK_SIZE; ++k)
+      {
         // half Ast = As[n][ty][k];
         // for (int c = 0; c < 2; c++){
-          Csub[n] = __hfma(As[n][ty][k], Bs[k][tx], Csub[n]);
+        Csub[n] = __hfma(As[n][ty][k], Bs[k][tx], Csub[n]);
         // }
       }
     }
@@ -1031,34 +1067,36 @@ __global__ void fetch_on_demand_gemm_fp16_1(
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < __ldg(&kpos[widx + 1]) ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
       // for (int c = 0; c < 2; c++){
       atomicAdd(&out_f[c_out * out_row + cx], Csub[n]);
       // }
     }
   }
 #else
-  #pragma message("FP16 kernels will not be compiled.")
+#pragma message("FP16 kernels will not be compiled.")
 #endif
 }
-
 
 /*
 BLOCK_SIZE = 16, N_LOOP = 4, SKEW = 8, blockDim.x = 16, blockDim.y = 16
 */
 template <int BLOCK_SIZE, int N_LOOP, int SKEW>
 __global__ void fetch_on_demand_gemm_no_fusion_fp16_1(
-                const int knnz,
-                const int c_in,
-                const int c_out,
-                const half *__restrict__ in_f, 
-                const half *__restrict__ kw, 
-                half *out_f,
-                const int *imap, 
-                const int *omap) {
+    const int knnz,
+    const int c_in,
+    const int c_out,
+    const half *__restrict__ in_f,
+    const half *__restrict__ kw,
+    half *out_f,
+    const int *imap,
+    const int *omap)
+{
 
 #if __CUDA_ARCH__ >= 700
 
@@ -1091,31 +1129,29 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp16_1(
   // Declaration of the shared memory array Bs used to
   // store the sub-matrix of B
   __shared__ half Bs[BLOCK_SIZE][BLOCK_SIZE + SKEW];
-  
+
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
 
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    Bs[ty][tx] = ((s + ty) < c_in && cx < c_out) ? 
-      *(kw_ptr + c_out * (s + ty) + cx) : 
-      padding;
-    
+    Bs[ty][tx] = ((s + ty) < c_in && cx < c_out) ? *(kw_ptr + c_out * (s + ty) + cx) : padding;
+
     // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    for (int n = 0; n < N_LOOP; n++)
+    {
 
       int y_temp = y + n * BLOCK_SIZE;
 
       // The thread deals with the x-th channel of the y-th output
       int in_row = y_temp < knnz ? imap[y_temp] : -1;
 
-      As[n][ty][tx] = ((s + tx) < c_in && in_row > -1) ? 
-        in_f[c_in * in_row + s + tx] : 
-        padding;
+      As[n][ty][tx] = ((s + tx) < c_in && in_row > -1) ? in_f[c_in * in_row + s + tx] : padding;
     }
 
     // Synchronize to make sure the matrices are loaded
@@ -1124,13 +1160,15 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp16_1(
     // Multiply the two matrices together;
     // each thread computes one element
     // of the block sub-matrix
-#pragma unroll 
-    for (int n = 0; n < N_LOOP; n++){
 #pragma unroll
-      for (int k = 0; k < BLOCK_SIZE; ++k) {
+    for (int n = 0; n < N_LOOP; n++)
+    {
+#pragma unroll
+      for (int k = 0; k < BLOCK_SIZE; ++k)
+      {
         // half Ast = As[n][ty][k];
         // for (int c = 0; c < 2; c++){
-          Csub[n] = __hfma(As[n][ty][k], Bs[k][tx], Csub[n]);
+        Csub[n] = __hfma(As[n][ty][k], Bs[k][tx], Csub[n]);
         // }
       }
     }
@@ -1144,43 +1182,45 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp16_1(
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < knnz ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
       // for (int c = 0; c < 2; c++){
       // atomicAdd(&out_f[c_out * out_row + cx], Csub[n]);
-      out_f[c_out * out_row + cx] = 
-        __hadd(out_f[c_out * out_row + cx], Csub[n]);
+      out_f[c_out * out_row + cx] =
+          __hadd(out_f[c_out * out_row + cx], Csub[n]);
       // }
     }
   }
 #else
-  #pragma message("FP16 kernels will not be compiled.")
+#pragma message("FP16 kernels will not be compiled.")
 #endif
 }
-
 
 // kernels using tensor cores
 // using namespace nvcuda;
 /*
-BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, M = 16, K = 8, N = 16, 
+BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, M = 16, K = 8, N = 16,
 MS = 2, NS = 2, WS = 4 = MS x NS
 blockDim.x = 8, blockDim.y = 32
 */
-template <int BLOCK_SIZE, int N_LOOP, int SKEW, 
-  int M, int K, int N, int WS, int MS, int NS>
+template <int BLOCK_SIZE, int N_LOOP, int SKEW,
+          int M, int K, int N, int WS, int MS, int NS>
 __global__ void fetch_on_demand_gemm_tf32(
-                const int *__restrict__ kpos,
-                const int *__restrict__ qkpos, 
-                const int k_vol, 
-                const int c_in,
-                const int c_out,
-                const float *__restrict__ in_f, 
-                const float *__restrict__ kw, 
-                float *out_f,
-                const int *imap, 
-                const int *omap) {
+    const int *__restrict__ kpos,
+    const int *__restrict__ qkpos,
+    const int k_vol,
+    const int c_in,
+    const int c_out,
+    const float *__restrict__ in_f,
+    const float *__restrict__ kw,
+    float *out_f,
+    const int *imap,
+    const int *omap)
+{
 #if __CUDA_ARCH__ >= 800
 
   // Block index
@@ -1202,11 +1242,10 @@ __global__ void fetch_on_demand_gemm_tf32(
   // Weight index
   const int widx = binary_search(qkpos, by * N_LOOP * BLOCK_SIZE, 0, k_vol);
   const float *kw_ptr = &kw[widx * c_in * c_out];
-  
+
   // Coordinate. x is for rows, y is for columns.
   const int cx = BLOCK_SIZE * bx + ctx;
-  const int y = BLOCK_SIZE * N_LOOP * by + ty 
-    - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
+  const int y = BLOCK_SIZE * N_LOOP * by + ty - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
 
   // Csub is used to store the element of the block sub-matrix
   // that is computed by the thread
@@ -1229,36 +1268,35 @@ __global__ void fetch_on_demand_gemm_tf32(
   nvcuda::wmma::fragment<nvcuda::wmma::accumulator, M, N, K, float> c[N_LOOP / 2];
 
 #pragma unroll
-  for (int n = 0; n < N_LOOP / 2; n++){
+  for (int n = 0; n < N_LOOP / 2; n++)
+  {
     nvcuda::wmma::fill_fragment(c[n], 0.0f);
   }
-  
+
   // May not be necessary
   __syncthreads();
 
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    *((float4*)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? 
-      *((float4*)(kw_ptr + c_out * (s + ty) + cx)) : 
-      *((float4*)(&padding[0]));
-    
+    *((float4 *)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? *((float4 *)(kw_ptr + c_out * (s + ty) + cx)) : *((float4 *)(&padding[0]));
+
     // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    for (int n = 0; n < N_LOOP; n++)
+    {
 
       int y_temp = y + n * BLOCK_SIZE;
 
       // The thread deals with the x-th channel of the y-th output
       int in_row = y_temp < __ldg(&kpos[widx + 1]) ? imap[y_temp] : -1;
 
-      *((float4*)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? 
-        *((float4*)(&in_f[c_in * in_row + s + ctx])) : 
-        *((float4*)(&padding[0]));
+      *((float4 *)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? *((float4 *)(&in_f[c_in * in_row + s + ctx])) : *((float4 *)(&padding[0]));
     }
 
     // Synchronize to make sure the matrices are loaded
@@ -1268,23 +1306,27 @@ __global__ void fetch_on_demand_gemm_tf32(
     // Load data from shmem to tensor core
     // Just load Bs once
 #pragma unroll
-    for (int k = 0; k < BLOCK_SIZE; k += K){
+    for (int k = 0; k < BLOCK_SIZE; k += K)
+    {
       nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, M, N, K, nvcuda::wmma::precision::tf32, nvcuda::wmma::row_major> a[N_LOOP / 2];
       nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, M, N, K, nvcuda::wmma::precision::tf32, nvcuda::wmma::row_major> b;
       nvcuda::wmma::load_matrix_sync(b, &Bs[k][warp_col * N], BLOCK_SIZE + SKEW);
 #pragma unroll
-      for (int t = 0; t < b.num_elements; t++) {
-          b.x[t] = nvcuda::wmma::__float_to_tf32(b.x[t]);
+      for (int t = 0; t < b.num_elements; t++)
+      {
+        b.x[t] = nvcuda::wmma::__float_to_tf32(b.x[t]);
       }
 #pragma unroll
-      for (int n = 0; n < N_LOOP / 2; n++){
+      for (int n = 0; n < N_LOOP / 2; n++)
+      {
         nvcuda::wmma::load_matrix_sync(a[n], &As[n * MS + warpId / WS][warp_row % MS * M][k], BLOCK_SIZE + SKEW);
 #pragma unroll
-        for (int t = 0; t < a[n].num_elements; t++) {
+        for (int t = 0; t < a[n].num_elements; t++)
+        {
           a[n].x[t] = nvcuda::wmma::__float_to_tf32(a[n].x[t]);
         }
         nvcuda::wmma::mma_sync(c[n], a[n], b, c[n]);
-      }  
+      }
     }
     // Synchronize to make sure that the preceding
     // computation is done before loading two new
@@ -1295,50 +1337,54 @@ __global__ void fetch_on_demand_gemm_tf32(
   // Store C fragments to shared memory
   // Note that we reuse As for Cs storing
 #pragma unroll
-  for (int n = 0; n < N_LOOP / 2; n++){
-    nvcuda::wmma::store_matrix_sync(&As[n * MS + warpId / WS][warp_row % MS * M][warp_col * N], 
-      c[n], BLOCK_SIZE + SKEW, nvcuda::wmma::mem_row_major);
+  for (int n = 0; n < N_LOOP / 2; n++)
+  {
+    nvcuda::wmma::store_matrix_sync(&As[n * MS + warpId / WS][warp_row % MS * M][warp_col * N],
+                                    c[n], BLOCK_SIZE + SKEW, nvcuda::wmma::mem_row_major);
   }
 
-  // Synchronize to make sure that all C fragments are 
+  // Synchronize to make sure that all C fragments are
   // stored into shared memory
   __syncthreads();
 
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < __ldg(&kpos[widx + 1]) ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
 #pragma unroll
-      for (int c = 0; c < 4; c++){
+      for (int c = 0; c < 4; c++)
+      {
         atomicAdd(&out_f[c_out * out_row + cx + c], As[n][ty][ctx + c]);
       }
     }
   }
 #else
-  #pragma message("TF32 kernels will not be compiled.")
+#pragma message("TF32 kernels will not be compiled.")
 #endif
 }
 
-
 /*
-BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, M = 16, K = 8, N = 16, 
+BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, M = 16, K = 8, N = 16,
 MS = 2, NS = 2, WS = 4 = MS x NS
 blockDim.x = 8, blockDim.y = 32
 */
-template <int BLOCK_SIZE, int N_LOOP, int SKEW, 
-  int M, int K, int N, int WS, int MS, int NS>
+template <int BLOCK_SIZE, int N_LOOP, int SKEW,
+          int M, int K, int N, int WS, int MS, int NS>
 __global__ void fetch_on_demand_gemm_no_fusion_tf32(
-                const int knnz,
-                const int c_in,
-                const int c_out,
-                const float *__restrict__ in_f, 
-                const float *__restrict__ kw, 
-                float *out_f,
-                const int *imap, 
-                const int *omap) {
+    const int knnz,
+    const int c_in,
+    const int c_out,
+    const float *__restrict__ in_f,
+    const float *__restrict__ kw,
+    float *out_f,
+    const int *imap,
+    const int *omap)
+{
 #if __CUDA_ARCH__ >= 800
   // Block index
   const int bx = blockIdx.x;
@@ -1360,7 +1406,7 @@ __global__ void fetch_on_demand_gemm_no_fusion_tf32(
   // const int widx = binary_search(qkpos, by * N_LOOP * BLOCK_SIZE, 0, k_vol);
   // const float *kw_ptr = &kw[widx * c_in * c_out];
   const float *kw_ptr = &kw[0];
-  
+
   // Coordinate. x is for rows, y is for columns.
   const int cx = BLOCK_SIZE * bx + ctx;
   const int y = BLOCK_SIZE * N_LOOP * by + ty;
@@ -1386,36 +1432,35 @@ __global__ void fetch_on_demand_gemm_no_fusion_tf32(
   nvcuda::wmma::fragment<nvcuda::wmma::accumulator, M, N, K, float> c[N_LOOP / 2];
 
 #pragma unroll
-  for (int n = 0; n < N_LOOP / 2; n++){
+  for (int n = 0; n < N_LOOP / 2; n++)
+  {
     nvcuda::wmma::fill_fragment(c[n], 0.0f);
   }
-  
+
   // May not be necessary
   __syncthreads();
 
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    *((float4*)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? 
-      *((float4*)(kw_ptr + c_out * (s + ty) + cx)) : 
-      *((float4*)(&padding[0]));
-    
+    *((float4 *)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? *((float4 *)(kw_ptr + c_out * (s + ty) + cx)) : *((float4 *)(&padding[0]));
+
     // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    for (int n = 0; n < N_LOOP; n++)
+    {
 
       int y_temp = y + n * BLOCK_SIZE;
 
       // The thread deals with the x-th channel of the y-th output
       int in_row = y_temp < knnz ? imap[y_temp] : -1;
 
-      *((float4*)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? 
-        *((float4*)(&in_f[c_in * in_row + s + ctx])) : 
-        *((float4*)(&padding[0]));
+      *((float4 *)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? *((float4 *)(&in_f[c_in * in_row + s + ctx])) : *((float4 *)(&padding[0]));
     }
 
     // Synchronize to make sure the matrices are loaded
@@ -1425,23 +1470,27 @@ __global__ void fetch_on_demand_gemm_no_fusion_tf32(
     // Load data from shmem to tensor core
     // Just load Bs once
 #pragma unroll
-    for (int k = 0; k < BLOCK_SIZE; k += K){
+    for (int k = 0; k < BLOCK_SIZE; k += K)
+    {
       nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, M, N, K, nvcuda::wmma::precision::tf32, nvcuda::wmma::row_major> a[N_LOOP / 2];
       nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, M, N, K, nvcuda::wmma::precision::tf32, nvcuda::wmma::row_major> b;
       nvcuda::wmma::load_matrix_sync(b, &Bs[k][warp_col * N], BLOCK_SIZE + SKEW);
 #pragma unroll
-      for (int t = 0; t < b.num_elements; t++) {
-          b.x[t] = nvcuda::wmma::__float_to_tf32(b.x[t]);
+      for (int t = 0; t < b.num_elements; t++)
+      {
+        b.x[t] = nvcuda::wmma::__float_to_tf32(b.x[t]);
       }
 #pragma unroll
-      for (int n = 0; n < N_LOOP / 2; n++){
+      for (int n = 0; n < N_LOOP / 2; n++)
+      {
         nvcuda::wmma::load_matrix_sync(a[n], &As[n * MS + warpId / WS][warp_row % MS * M][k], BLOCK_SIZE + SKEW);
 #pragma unroll
-        for (int t = 0; t < a[n].num_elements; t++) {
+        for (int t = 0; t < a[n].num_elements; t++)
+        {
           a[n].x[t] = nvcuda::wmma::__float_to_tf32(a[n].x[t]);
         }
-        nvcuda::wmma::mma_sync(c[n], a[n], b, c[n]); 
-      }  
+        nvcuda::wmma::mma_sync(c[n], a[n], b, c[n]);
+      }
     }
     // Synchronize to make sure that the preceding
     // computation is done before loading two new
@@ -1452,53 +1501,58 @@ __global__ void fetch_on_demand_gemm_no_fusion_tf32(
   // Store C fragments to shared memory
   // Note that we reuse As for Cs storing
 #pragma unroll
-  for (int n = 0; n < N_LOOP / 2; n++){
-    nvcuda::wmma::store_matrix_sync(&As[n * MS + warpId / WS][warp_row % MS * M][warp_col * N], 
-      c[n], BLOCK_SIZE + SKEW, nvcuda::wmma::mem_row_major);
+  for (int n = 0; n < N_LOOP / 2; n++)
+  {
+    nvcuda::wmma::store_matrix_sync(&As[n * MS + warpId / WS][warp_row % MS * M][warp_col * N],
+                                    c[n], BLOCK_SIZE + SKEW, nvcuda::wmma::mem_row_major);
   }
 
-  // Synchronize to make sure that all C fragments are 
+  // Synchronize to make sure that all C fragments are
   // stored into shared memory
   __syncthreads();
 
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < knnz ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
 #pragma unroll
-      for (int c = 0; c < 4; c++){
+      for (int c = 0; c < 4; c++)
+      {
         // atomicAdd(&out_f[c_out * out_row + cx + c], As[n][ty][ctx + c]);
         out_f[c_out * out_row + cx + c] += As[n][ty][ctx + c];
       }
     }
   }
 #else
-  #pragma message("TF32 kernels will not be compiled.")
+#pragma message("TF32 kernels will not be compiled.")
 #endif
 }
 ////////////////////////////// CUDA_ARCH >= 800 for TF32 ///////////////////////////////////
 
 /*
-BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, M = 16, K = 16, N = 16, 
+BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, M = 16, K = 16, N = 16,
 MS = 2, NS = 2, WS = 4 = MS x NS
 blockDim.x = 8, blockDim.y = 32
 */
-template <int BLOCK_SIZE, int N_LOOP, int SKEW, 
-  int M, int K, int N, int WS, int MS, int NS>
+template <int BLOCK_SIZE, int N_LOOP, int SKEW,
+          int M, int K, int N, int WS, int MS, int NS>
 __global__ void fetch_on_demand_gemm_fp16_tc4(
-                const int *__restrict__ kpos,
-                const int *__restrict__ qkpos, 
-                const int k_vol, 
-                const int c_in,
-                const int c_out,
-                const half *__restrict__ in_f, 
-                const half *__restrict__ kw, 
-                half *out_f,
-                const int *imap, 
-                const int *omap) {
+    const int *__restrict__ kpos,
+    const int *__restrict__ qkpos,
+    const int k_vol,
+    const int c_in,
+    const int c_out,
+    const half *__restrict__ in_f,
+    const half *__restrict__ kw,
+    half *out_f,
+    const int *imap,
+    const int *omap)
+{
 #if __CUDA_ARCH__ >= 700
 
   // Block index
@@ -1520,11 +1574,10 @@ __global__ void fetch_on_demand_gemm_fp16_tc4(
   // Weight index
   const int widx = binary_search(qkpos, by * N_LOOP * BLOCK_SIZE, 0, k_vol);
   const half *kw_ptr = &kw[widx * c_in * c_out];
-  
+
   // Coordinate. x is for rows, y is for columns.
   const int cx = BLOCK_SIZE * bx + ctx;
-  const int y = BLOCK_SIZE * N_LOOP * by + ty 
-    - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
+  const int y = BLOCK_SIZE * N_LOOP * by + ty - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
 
   // Csub is used to store the element of the block sub-matrix
   // that is computed by the thread
@@ -1547,36 +1600,35 @@ __global__ void fetch_on_demand_gemm_fp16_tc4(
   nvcuda::wmma::fragment<nvcuda::wmma::accumulator, M, N, K, half> c[N_LOOP / 2];
 
 #pragma unroll
-  for (int n = 0; n < N_LOOP / 2; n++){
+  for (int n = 0; n < N_LOOP / 2; n++)
+  {
     nvcuda::wmma::fill_fragment(c[n], __float2half(0.0f));
   }
-  
+
   // May not be necessary
   __syncthreads();
 
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    *((float2*)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? 
-      *((float2*)(kw_ptr + c_out * (s + ty) + cx)) : 
-      *((float2*)(&padding[0]));
-    
+    *((float2 *)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? *((float2 *)(kw_ptr + c_out * (s + ty) + cx)) : *((float2 *)(&padding[0]));
+
     // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    for (int n = 0; n < N_LOOP; n++)
+    {
 
       int y_temp = y + n * BLOCK_SIZE;
 
       // The thread deals with the x-th channel of the y-th output
       int in_row = y_temp < __ldg(&kpos[widx + 1]) ? imap[y_temp] : -1;
 
-      *((float2*)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? 
-        *((float2*)(&in_f[c_in * in_row + s + ctx])) : 
-        *((float2*)(&padding[0]));
+      *((float2 *)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? *((float2 *)(&in_f[c_in * in_row + s + ctx])) : *((float2 *)(&padding[0]));
     }
 
     // Synchronize to make sure the matrices are loaded
@@ -1586,15 +1638,17 @@ __global__ void fetch_on_demand_gemm_fp16_tc4(
     // Load data from shmem to tensor core
     // Just load Bs once
 #pragma unroll
-    for (int k = 0; k < BLOCK_SIZE; k += K){
+    for (int k = 0; k < BLOCK_SIZE; k += K)
+    {
       nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, M, N, K, half, nvcuda::wmma::row_major> a[N_LOOP / 2];
       nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, M, N, K, half, nvcuda::wmma::row_major> b;
       nvcuda::wmma::load_matrix_sync(b, &Bs[k][warp_col * N], BLOCK_SIZE + SKEW);
 #pragma unroll
-      for (int n = 0; n < N_LOOP / 2; n++){
+      for (int n = 0; n < N_LOOP / 2; n++)
+      {
         nvcuda::wmma::load_matrix_sync(a[n], &As[n * MS + warpId / WS][warp_row % MS * M][k], BLOCK_SIZE + SKEW);
         nvcuda::wmma::mma_sync(c[n], a[n], b, c[n]);
-      }  
+      }
     }
     // Synchronize to make sure that the preceding
     // computation is done before loading two new
@@ -1605,52 +1659,56 @@ __global__ void fetch_on_demand_gemm_fp16_tc4(
   // Store C fragments to shared memory
   // Note that we reuse As for Cs storing
 #pragma unroll
-  for (int n = 0; n < N_LOOP / 2; n++){
-    nvcuda::wmma::store_matrix_sync(&As[n * MS + warpId / WS][warp_row % MS * M][warp_col * N], 
-      c[n], BLOCK_SIZE + SKEW, nvcuda::wmma::mem_row_major);
+  for (int n = 0; n < N_LOOP / 2; n++)
+  {
+    nvcuda::wmma::store_matrix_sync(&As[n * MS + warpId / WS][warp_row % MS * M][warp_col * N],
+                                    c[n], BLOCK_SIZE + SKEW, nvcuda::wmma::mem_row_major);
   }
 
-  // Synchronize to make sure that all C fragments are 
+  // Synchronize to make sure that all C fragments are
   // stored into shared memory
   __syncthreads();
 
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < __ldg(&kpos[widx + 1]) ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
 #pragma unroll
-      for (int c = 0; c < 4; c++){
+      for (int c = 0; c < 4; c++)
+      {
         atomicAdd(&out_f[c_out * out_row + cx + c], As[n][ty][ctx + c]);
       }
     }
   }
 #else
-  #pragma message("FP16 kernels will not be compiled.")
+#pragma message("FP16 kernels will not be compiled.")
 #endif
 }
 
-
 /*
-BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, M = 16, K = 16, N = 16, 
+BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, M = 16, K = 16, N = 16,
 MS = 2, NS = 2, WS = 4 = MS x NS
 blockDim.x = 8, blockDim.y = 32
 */
-template <int BLOCK_SIZE, int N_LOOP, int SKEW, 
-  int M, int K, int N, int WS, int MS, int NS>
+template <int BLOCK_SIZE, int N_LOOP, int SKEW,
+          int M, int K, int N, int WS, int MS, int NS>
 __global__ void fetch_on_demand_gemm_fp16_tc4_async(
-                const int *__restrict__ kpos,
-                const int *__restrict__ qkpos, 
-                const int k_vol, 
-                const int c_in,
-                const int c_out,
-                const half *__restrict__ in_f, 
-                const half *__restrict__ kw, 
-                half *out_f,
-                const int *imap, 
-                const int *omap) {
+    const int *__restrict__ kpos,
+    const int *__restrict__ qkpos,
+    const int k_vol,
+    const int c_in,
+    const int c_out,
+    const half *__restrict__ in_f,
+    const half *__restrict__ kw,
+    half *out_f,
+    const int *imap,
+    const int *omap)
+{
 #if __CUDA_ARCH__ >= 700
 
   // Block index
@@ -1672,11 +1730,10 @@ __global__ void fetch_on_demand_gemm_fp16_tc4_async(
   // Weight index
   const int widx = binary_search(qkpos, by * N_LOOP * BLOCK_SIZE, 0, k_vol);
   const half *kw_ptr = &kw[widx * c_in * c_out];
-  
+
   // Coordinate. x is for rows, y is for columns.
   const int cx = BLOCK_SIZE * bx + ctx;
-  const int y = BLOCK_SIZE * N_LOOP * by + ty 
-    - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
+  const int y = BLOCK_SIZE * N_LOOP * by + ty - __ldg(&qkpos[widx]) + __ldg(&kpos[widx]);
 
   // Csub is used to store the element of the block sub-matrix
   // that is computed by the thread
@@ -1703,48 +1760,55 @@ __global__ void fetch_on_demand_gemm_fp16_tc4_async(
   nvcuda::wmma::fragment<nvcuda::wmma::accumulator, M, N, K, half> c[N_LOOP / 2];
 
 #pragma unroll
-  for (int n = 0; n < N_LOOP / 2; n++){
+  for (int n = 0; n < N_LOOP / 2; n++)
+  {
     nvcuda::wmma::fill_fragment(c[n], __float2half(0.0f));
   }
-  
+
   // May not be necessary
   __syncthreads();
 
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    // const half *kw2Bs_ptr = ((s + ty) < c_in && cx < c_out) ? 
+    // const half *kw2Bs_ptr = ((s + ty) < c_in && cx < c_out) ?
     //   kw_ptr + c_out * (s + ty) + cx : &padding[0];
     pipe.producer_acquire();
-    if ((s + ty) < c_in && cx < c_out){
+    if ((s + ty) < c_in && cx < c_out)
+    {
       cuda::memcpy_async(&Bs[ty][ctx], kw_ptr + c_out * (s + ty) + cx, shape4, pipe);
     }
-    else{
+    else
+    {
       cuda::memcpy_async(&Bs[ty][ctx], &padding[0], shape4, pipe);
     }
     // cuda::memcpy_async(&Bs[ty][ctx], kw2Bs_ptr, shape4, pipe);
     pipe.producer_commit();
-    
+
     // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    for (int n = 0; n < N_LOOP; n++)
+    {
 
       int y_temp = y + n * BLOCK_SIZE;
 
       // The thread deals with the x-th channel of the y-th output
       int in_row = y_temp < __ldg(&kpos[widx + 1]) ? imap[y_temp] : -1;
 
-      // const half *inf2As_ptr = ((s + ctx) < c_in && in_row > -1) ? 
+      // const half *inf2As_ptr = ((s + ctx) < c_in && in_row > -1) ?
       //   &in_f[c_in * in_row + s + ctx] : &padding[0];
       pipe.producer_acquire();
-      if ((s + ctx) < c_in && in_row > -1){
+      if ((s + ctx) < c_in && in_row > -1)
+      {
         cuda::memcpy_async(&As[n][ty][ctx], &in_f[c_in * in_row + s + ctx], shape4, pipe);
       }
-      else{
+      else
+      {
         cuda::memcpy_async(&As[n][ty][ctx], &padding[0], shape4, pipe);
       }
       // cuda::memcpy_async(&As[n][ty][ctx], inf2As_ptr, shape4, pipe);
@@ -1759,16 +1823,19 @@ __global__ void fetch_on_demand_gemm_fp16_tc4_async(
     // Load data from shmem to tensor core
     // Just load Bs once
 #pragma unroll
-    for (int k = 0; k < BLOCK_SIZE; k += K){
+    for (int k = 0; k < BLOCK_SIZE; k += K)
+    {
       nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, M, N, K, half, nvcuda::wmma::row_major> a[N_LOOP / 2];
       nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, M, N, K, half, nvcuda::wmma::row_major> b;
       nvcuda::wmma::load_matrix_sync(b, &Bs[k][warp_col * N], BLOCK_SIZE + SKEW);
 #pragma unroll
-      for (int n = 0; n < N_LOOP / 2; n++){
+      for (int n = 0; n < N_LOOP / 2; n++)
+      {
         nvcuda::wmma::load_matrix_sync(a[n], &As[n * MS + warpId / WS][warp_row % MS * M][k], BLOCK_SIZE + SKEW);
-      }  
-#pragma unroll 
-      for (int n = 0; n < N_LOOP / 2; n++){
+      }
+#pragma unroll
+      for (int n = 0; n < N_LOOP / 2; n++)
+      {
         nvcuda::wmma::mma_sync(c[n], a[n], b, c[n]);
       }
     }
@@ -1782,50 +1849,54 @@ __global__ void fetch_on_demand_gemm_fp16_tc4_async(
   // Store C fragments to shared memory
   // Note that we reuse As for Cs storing
 #pragma unroll
-  for (int n = 0; n < N_LOOP / 2; n++){
-    nvcuda::wmma::store_matrix_sync(&As[n * MS + warpId / WS][warp_row % MS * M][warp_col * N], 
-      c[n], BLOCK_SIZE + SKEW, nvcuda::wmma::mem_row_major);
+  for (int n = 0; n < N_LOOP / 2; n++)
+  {
+    nvcuda::wmma::store_matrix_sync(&As[n * MS + warpId / WS][warp_row % MS * M][warp_col * N],
+                                    c[n], BLOCK_SIZE + SKEW, nvcuda::wmma::mem_row_major);
   }
 
-  // Synchronize to make sure that all C fragments are 
+  // Synchronize to make sure that all C fragments are
   // stored into shared memory
   __syncthreads();
 
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < __ldg(&kpos[widx + 1]) ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
 #pragma unroll
-      for (int c = 0; c < 4; c++){
+      for (int c = 0; c < 4; c++)
+      {
         atomicAdd(&out_f[c_out * out_row + cx + c], As[n][ty][ctx + c]);
       }
     }
   }
 #else
-  #pragma message("FP16 kernels with asynchronous copy will not be compiled.")
+#pragma message("FP16 kernels with asynchronous copy will not be compiled.")
 #endif
 }
 
-
 /*
-BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, M = 16, K = 16, N = 16, 
+BLOCK_SIZE = 32, N_LOOP = 4, SKEW = 8, M = 16, K = 16, N = 16,
 MS = 2, NS = 2, WS = 4 = MS x NS
 blockDim.x = 8, blockDim.y = 32
 */
-template <int BLOCK_SIZE, int N_LOOP, int SKEW, 
-  int M, int K, int N, int WS, int MS, int NS>
+template <int BLOCK_SIZE, int N_LOOP, int SKEW,
+          int M, int K, int N, int WS, int MS, int NS>
 __global__ void fetch_on_demand_gemm_no_fusion_fp16(
-                const int knnz,
-                const int c_in,
-                const int c_out,
-                const half *__restrict__ in_f, 
-                const half *__restrict__ kw, 
-                half *out_f,
-                const int *imap, 
-                const int *omap) {
+    const int knnz,
+    const int c_in,
+    const int c_out,
+    const half *__restrict__ in_f,
+    const half *__restrict__ kw,
+    half *out_f,
+    const int *imap,
+    const int *omap)
+{
 #if __CUDA_ARCH__ >= 700
   // Block index
   const int bx = blockIdx.x;
@@ -1847,7 +1918,7 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp16(
   // const int widx = binary_search(qkpos, by * N_LOOP * BLOCK_SIZE, 0, k_vol);
   // const half *kw_ptr = &kw[widx * c_in * c_out];
   const half *kw_ptr = &kw[0];
-  
+
   // Coordinate. x is for rows, y is for columns.
   const int cx = BLOCK_SIZE * bx + ctx;
   const int y = BLOCK_SIZE * N_LOOP * by + ty;
@@ -1873,36 +1944,35 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp16(
   nvcuda::wmma::fragment<nvcuda::wmma::accumulator, M, N, K, half> c[N_LOOP / 2];
 
 #pragma unroll
-  for (int n = 0; n < N_LOOP / 2; n++){
+  for (int n = 0; n < N_LOOP / 2; n++)
+  {
     nvcuda::wmma::fill_fragment(c[n], __float2half(0.0f));
   }
-  
+
   // May not be necessary
   __syncthreads();
 
   // Loop over all the sub-matrices of A and B
   // required to compute the block sub-matrix
-  for (int s = 0; s < c_in; s += BLOCK_SIZE) {
+  for (int s = 0; s < c_in; s += BLOCK_SIZE)
+  {
     // Load the matrices from device memory
     // to shared memory; each thread loads
     // one element of each matrix
 
     // Kernel weight to Bs
-    *((float2*)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? 
-      *((float2*)(kw_ptr + c_out * (s + ty) + cx)) : 
-      *((float2*)(&padding[0]));
-    
+    *((float2 *)(&Bs[ty][ctx])) = ((s + ty) < c_in && cx < c_out) ? *((float2 *)(kw_ptr + c_out * (s + ty) + cx)) : *((float2 *)(&padding[0]));
+
     // Input feature to As
-    for (int n = 0; n < N_LOOP; n++){
+    for (int n = 0; n < N_LOOP; n++)
+    {
 
       int y_temp = y + n * BLOCK_SIZE;
 
       // The thread deals with the x-th channel of the y-th output
       int in_row = y_temp < knnz ? imap[y_temp] : -1;
 
-      *((float2*)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? 
-        *((float2*)(&in_f[c_in * in_row + s + ctx])) : 
-        *((float2*)(&padding[0]));
+      *((float2 *)(&As[n][ty][ctx])) = ((s + ctx) < c_in && in_row > -1) ? *((float2 *)(&in_f[c_in * in_row + s + ctx])) : *((float2 *)(&padding[0]));
     }
 
     // Synchronize to make sure the matrices are loaded
@@ -1912,15 +1982,17 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp16(
     // Load data from shmem to tensor core
     // Just load Bs once
 #pragma unroll
-    for (int k = 0; k < BLOCK_SIZE; k += K){
+    for (int k = 0; k < BLOCK_SIZE; k += K)
+    {
       nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, M, N, K, half, nvcuda::wmma::row_major> a[N_LOOP / 2];
       nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, M, N, K, half, nvcuda::wmma::row_major> b;
       nvcuda::wmma::load_matrix_sync(b, &Bs[k][warp_col * N], BLOCK_SIZE + SKEW);
 #pragma unroll
-      for (int n = 0; n < N_LOOP / 2; n++){
+      for (int n = 0; n < N_LOOP / 2; n++)
+      {
         nvcuda::wmma::load_matrix_sync(a[n], &As[n * MS + warpId / WS][warp_row % MS * M][k], BLOCK_SIZE + SKEW);
         nvcuda::wmma::mma_sync(c[n], a[n], b, c[n]);
-      }  
+      }
     }
     // Synchronize to make sure that the preceding
     // computation is done before loading two new
@@ -1931,38 +2003,39 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp16(
   // Store C fragments to shared memory
   // Note that we reuse As for Cs storing
 #pragma unroll
-  for (int n = 0; n < N_LOOP / 2; n++){
-    nvcuda::wmma::store_matrix_sync(&As[n * MS + warpId / WS][warp_row % MS * M][warp_col * N], 
-      c[n], BLOCK_SIZE + SKEW, nvcuda::wmma::mem_row_major);
+  for (int n = 0; n < N_LOOP / 2; n++)
+  {
+    nvcuda::wmma::store_matrix_sync(&As[n * MS + warpId / WS][warp_row % MS * M][warp_col * N],
+                                    c[n], BLOCK_SIZE + SKEW, nvcuda::wmma::mem_row_major);
   }
 
-  // Synchronize to make sure that all C fragments are 
+  // Synchronize to make sure that all C fragments are
   // stored into shared memory
   __syncthreads();
 
   // Write the block sub-matrix to device memory;
   // each thread writes one element
 #pragma unroll
-  for (int n = 0; n < N_LOOP; n++){
+  for (int n = 0; n < N_LOOP; n++)
+  {
     int y_temp = y + n * BLOCK_SIZE;
     int out_row = y_temp < knnz ? omap[y_temp] : -1;
-    if (out_row > -1 && cx < c_out){
+    if (out_row > -1 && cx < c_out)
+    {
 #pragma unroll
-      for (int c = 0; c < 4; c++){
+      for (int c = 0; c < 4; c++)
+      {
         // out_f[c_out * out_row + cx + c] += As[n][ty][ctx + c];
-        out_f[c_out * out_row + cx + c] = 
-          __hadd(out_f[c_out * out_row + cx + c], As[n][ty][ctx + c]);
+        out_f[c_out * out_row + cx + c] =
+            __hadd(out_f[c_out * out_row + cx + c], As[n][ty][ctx + c]);
       }
     }
   }
 #else
-  #pragma message("FP16 kernels will not be compiled.")
+#pragma message("FP16 kernels will not be compiled.")
 #endif
 }
 ///////////////////////////////// CUDA_ARCH >= 700 ///////////////////////////////////
-
-
-
 
 // in_feat: (N, c) N=# of input points, c = input channels
 // out_feat: (M, o) M=# of output points, o = output channels
@@ -1979,11 +2052,12 @@ __global__ void fetch_on_demand_gemm_no_fusion_fp16(
 //                      with unused weights having 0 and neighbor_offset[k^3/2]
 //                      holding w[0,0].
 at::Tensor conv_forward_fetch_on_demand_cuda(
-    at::Tensor in_feat, at::Tensor kernel, 
-    at::Tensor neighbor_map, const int sum_nnz, 
+    at::Tensor in_feat, at::Tensor kernel,
+    at::Tensor neighbor_map, const int sum_nnz,
     at::Tensor neighbor_address, at::Tensor q_neighbor_address,
-    const int output_size, const int qsum_nnz, const bool transpose, 
-    const bool allow_tf32, const bool allow_fp16) {
+    const int output_size, const int qsum_nnz, const bool transpose,
+    const bool allow_tf32, const bool allow_fp16)
+{
 
   // int sum_nnz = (int)torch::sum(neighbor_offset).item<int>();
   int input_size = in_feat.size(0);
@@ -1997,21 +2071,23 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
   int *qkpos_ptr = q_neighbor_address.data_ptr<int>();
   int *in_map_ptr;
   int *out_map_ptr;
-  if (transpose){
+  if (transpose)
+  {
     in_map_ptr = neighbor_map.data_ptr<int>() + sum_nnz;
     out_map_ptr = neighbor_map.data_ptr<int>();
   }
-  else{
+  else
+  {
     in_map_ptr = neighbor_map.data_ptr<int>();
     out_map_ptr = neighbor_map.data_ptr<int>() + sum_nnz;
   }
 
   // memory allocation
-  at::Tensor out_feat = torch::zeros({output_size, out_channel}, 
-            at::device(in_feat.device()).dtype(in_feat.scalar_type()));
-  // at::Tensor kpos = torch::zeros({k_vol + 1}, 
+  at::Tensor out_feat = torch::zeros({output_size, out_channel},
+                                     at::device(in_feat.device()).dtype(in_feat.scalar_type()));
+  // at::Tensor kpos = torch::zeros({k_vol + 1},
   //           at::device(in_feat.device()).dtype(at::ScalarType::Int));
-  // at::Tensor qkpos = torch::zeros({k_vol + 1}, 
+  // at::Tensor qkpos = torch::zeros({k_vol + 1},
   //           at::device(in_feat.device()).dtype(at::ScalarType::Int));
   // int *kpos_ptr = kpos.data_ptr<int>();
   // int *qkpos_ptr = qkpos.data_ptr<int>();
@@ -2030,114 +2106,131 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
   // int qsum_nnz = qkpos[k_vol].item<int>();
   // printf("%d", qsum_nnz);
 
-  if (data_type_half && allow_fp16){
-    if (in_channel % 4 == 0 && out_channel % 4 == 0){    
-      if (in_channel <= 16 || out_channel <= 16){
+  if (data_type_half && allow_fp16)
+  {
+    if (in_channel % 4 == 0 && out_channel % 4 == 0)
+    {
+      if (in_channel <= 16 || out_channel <= 16)
+      {
         fetch_on_demand_gemm_fp16_4_once<16, 4, 8>
-                    <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 64), 1), dim3(4, 16, 1)>>>(
-                    kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel, 
-                    reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
-                    reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
-                    reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
-                    in_map_ptr, out_map_ptr);
+            <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 64), 1), dim3(4, 16, 1)>>>(
+                kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
+                reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
+                reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
+                reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
+                in_map_ptr, out_map_ptr);
       }
-      else{
-        if (allow_tf32){
+      else
+      {
+        if (allow_tf32)
+        {
           fetch_on_demand_gemm_fp16_tc4_async<32, 4, 8, 16, 16, 16, 4, 2, 2>
-                    <<<dim3(DIV_UP(out_channel, 32), DIV_UP(qsum_nnz, 128), 1), dim3(8, 32, 1)>>>(
-                    kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel, 
-                    reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
-                    reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
-                    reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
-                    in_map_ptr, out_map_ptr);
+              <<<dim3(DIV_UP(out_channel, 32), DIV_UP(qsum_nnz, 128), 1), dim3(8, 32, 1)>>>(
+                  kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
+                  reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
+                  reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
+                  reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
+                  in_map_ptr, out_map_ptr);
         }
-        else{
+        else
+        {
           fetch_on_demand_gemm_fp16_tc4<32, 4, 8, 16, 16, 16, 4, 2, 2>
-                    <<<dim3(DIV_UP(out_channel, 32), DIV_UP(qsum_nnz, 128), 1), dim3(8, 32, 1)>>>(
-                    kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel, 
-                    reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
-                    reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
-                    reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
-                    in_map_ptr, out_map_ptr);
+              <<<dim3(DIV_UP(out_channel, 32), DIV_UP(qsum_nnz, 128), 1), dim3(8, 32, 1)>>>(
+                  kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
+                  reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
+                  reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
+                  reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
+                  in_map_ptr, out_map_ptr);
         }
       }
     }
-    else if (in_channel % 2 == 0 && out_channel % 2 == 0){
-        fetch_on_demand_gemm_fp16_2<16, 8, 8>
-                    <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 128), 1), dim3(8, 16, 1)>>>(
-                    kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel, 
-                    reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
-                    reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
-                    reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
-                    in_map_ptr, out_map_ptr);   
+    else if (in_channel % 2 == 0 && out_channel % 2 == 0)
+    {
+      fetch_on_demand_gemm_fp16_2<16, 8, 8>
+          <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 128), 1), dim3(8, 16, 1)>>>(
+              kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
+              reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
+              reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
+              reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
+              in_map_ptr, out_map_ptr);
     }
-    else{
-        fetch_on_demand_gemm_fp16_1<16, 4, 8>
-                    <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 64), 1), dim3(16, 16, 1)>>>(
-                    kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel, 
-                    reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
-                    reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
-                    reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
-                    in_map_ptr, out_map_ptr);  
-    }  
+    else
+    {
+      fetch_on_demand_gemm_fp16_1<16, 4, 8>
+          <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 64), 1), dim3(16, 16, 1)>>>(
+              kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
+              reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
+              reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
+              reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
+              in_map_ptr, out_map_ptr);
+    }
   }
-  else{
-    if(in_channel % 4 == 0 && out_channel % 4 ==0){
-      if (in_channel <= 16 && out_channel <= 16){
+  else
+  {
+    if (in_channel % 4 == 0 && out_channel % 4 == 0)
+    {
+      if (in_channel <= 16 && out_channel <= 16)
+      {
         fetch_on_demand_gemm_fp32_once<16, 4, 8>
-                    <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 64), 1), dim3(4, 16, 1)>>>(
-                    kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel, 
-                    in_feat.data_ptr<float>(), kernel.data_ptr<float>(), out_feat.data_ptr<float>(), 
-                    in_map_ptr, out_map_ptr);
+            <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 64), 1), dim3(4, 16, 1)>>>(
+                kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
+                in_feat.data_ptr<float>(), kernel.data_ptr<float>(), out_feat.data_ptr<float>(),
+                in_map_ptr, out_map_ptr);
       }
-      else{
-        if (allow_tf32){
-            fetch_on_demand_gemm_tf32<32, 4, 8, 16, 8, 16, 4, 2, 2>
-                    <<<dim3(DIV_UP(out_channel, 32), DIV_UP(qsum_nnz, 128), 1), dim3(8, 32, 1)>>>(
-                    kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel, 
-                    in_feat.data_ptr<float>(), kernel.data_ptr<float>(), out_feat.data_ptr<float>(), 
-                    in_map_ptr, out_map_ptr);
+      else
+      {
+        if (allow_tf32)
+        {
+          fetch_on_demand_gemm_tf32<32, 4, 8, 16, 8, 16, 4, 2, 2>
+              <<<dim3(DIV_UP(out_channel, 32), DIV_UP(qsum_nnz, 128), 1), dim3(8, 32, 1)>>>(
+                  kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
+                  in_feat.data_ptr<float>(), kernel.data_ptr<float>(), out_feat.data_ptr<float>(),
+                  in_map_ptr, out_map_ptr);
         }
-        else{
-            fetch_on_demand_gemm_fp32<32, 4, 8>
-                    <<<dim3(DIV_UP(out_channel, 32), DIV_UP(qsum_nnz, 128), 1), dim3(8, 32, 1)>>>(
-                    kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel, 
-                    in_feat.data_ptr<float>(), kernel.data_ptr<float>(), out_feat.data_ptr<float>(), 
-                    in_map_ptr, out_map_ptr);
+        else
+        {
+          fetch_on_demand_gemm_fp32<32, 4, 8>
+              <<<dim3(DIV_UP(out_channel, 32), DIV_UP(qsum_nnz, 128), 1), dim3(8, 32, 1)>>>(
+                  kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
+                  in_feat.data_ptr<float>(), kernel.data_ptr<float>(), out_feat.data_ptr<float>(),
+                  in_map_ptr, out_map_ptr);
         }
       }
     }
-    else if (in_channel % 2 == 0 && out_channel % 2 == 0){
-        fetch_on_demand_gemm_fp32_2<16, 8, 8>
-                    <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 128), 1), dim3(8, 16, 1)>>>(
-                    kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel, 
-                    in_feat.data_ptr<float>(), kernel.data_ptr<float>(), out_feat.data_ptr<float>(), 
-                    in_map_ptr, out_map_ptr);
+    else if (in_channel % 2 == 0 && out_channel % 2 == 0)
+    {
+      fetch_on_demand_gemm_fp32_2<16, 8, 8>
+          <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 128), 1), dim3(8, 16, 1)>>>(
+              kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
+              in_feat.data_ptr<float>(), kernel.data_ptr<float>(), out_feat.data_ptr<float>(),
+              in_map_ptr, out_map_ptr);
     }
-    else{
-        fetch_on_demand_gemm_fp32_1<16, 4, 8>
-                    <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 64), 1), dim3(16, 16, 1)>>>(
-                    kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel, 
-                    in_feat.data_ptr<float>(), kernel.data_ptr<float>(), out_feat.data_ptr<float>(), 
-                    in_map_ptr, out_map_ptr);
+    else
+    {
+      fetch_on_demand_gemm_fp32_1<16, 4, 8>
+          <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 64), 1), dim3(16, 16, 1)>>>(
+              kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
+              in_feat.data_ptr<float>(), kernel.data_ptr<float>(), out_feat.data_ptr<float>(),
+              in_map_ptr, out_map_ptr);
     }
   }
 
   // precomputation only for odd channel size
   // bool precompute_mid = (input_size == output_size && k_vol % 2 == 1);
-  if (precompute_mid){
+  if (precompute_mid)
+  {
     at::addmm_out(out_feat, out_feat, in_feat, kernel[mid_kernel]);
   }
 
   return out_feat;
 }
 
-
 at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
     at::Tensor in_feat, at::Tensor kernel,
-    at::Tensor neighbor_map, at::Tensor neighbor_offset, 
-    const int sum_nnz, const int output_size, const bool transpose, 
-    const bool allow_tf32, const bool allow_fp16){
+    at::Tensor neighbor_map, at::Tensor neighbor_offset,
+    const int sum_nnz, const int output_size, const bool transpose,
+    const bool allow_tf32, const bool allow_fp16)
+{
 
   // int sum_nnz = (int)torch::sum(neighbor_offset).item<int>();
   int input_size = in_feat.size(0);
@@ -2151,21 +2244,23 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
   // int *qkpos_ptr = q_neighbor_address.data_ptr<int>();
   int *in_map_ptr;
   int *out_map_ptr;
-  if (transpose){
+  if (transpose)
+  {
     in_map_ptr = neighbor_map.data_ptr<int>() + sum_nnz;
     out_map_ptr = neighbor_map.data_ptr<int>();
   }
-  else{
-    in_map_ptr = neighbor_map.data_ptr<int>();
-    out_map_ptr = neighbor_map.data_ptr<int>() + sum_nnz;
+  else
+  {
+    in_map_ptr = neighbor_map.data_ptr<int>();            // index of input_feats[non_zero_elems]
+    out_map_ptr = neighbor_map.data_ptr<int>() + sum_nnz; // index of output_feats[non_zero_elems]
   }
 
   // memory allocation
-  at::Tensor out_feat = torch::zeros({output_size, out_channel}, 
-            at::device(in_feat.device()).dtype(in_feat.scalar_type()));
-  // at::Tensor kpos = torch::zeros({k_vol + 1}, 
+  at::Tensor out_feat = torch::zeros({output_size, out_channel},
+                                     at::device(in_feat.device()).dtype(in_feat.scalar_type()));
+  // at::Tensor kpos = torch::zeros({k_vol + 1},
   //           at::device(in_feat.device()).dtype(at::ScalarType::Int));
-  // at::Tensor qkpos = torch::zeros({k_vol + 1}, 
+  // at::Tensor qkpos = torch::zeros({k_vol + 1},
   //           at::device(in_feat.device()).dtype(at::ScalarType::Int));
   // int *kpos_ptr = kpos.data_ptr<int>();
   // int *qkpos_ptr = qkpos.data_ptr<int>();
@@ -2181,70 +2276,75 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
   // loop over all kernel offsets
   int cur_idx = 0;
   // int stream_id = 0;
-  for (int k = 0; k < k_vol; k++){
+  for (int k = 0; k < k_vol; k++)
+  {
     int cur_nnz = knnz_ptr[k];
-    
-    if (cur_nnz == 0){continue;}
+
+    if (cur_nnz == 0)
+    {
+      continue;
+    }
 
     // size_t gridnum_x = DIV_UP(out_channel, 32);
     // size_t gridnum_y = DIV_UP(cur_nnz, 32);
 
-    if (data_type_half && allow_fp16){
-      if (in_channel % 4 == 0 && out_channel % 4 == 0){
+    if (data_type_half && allow_fp16)
+    {
+      if (in_channel % 4 == 0 && out_channel % 4 == 0)
+      {
         fetch_on_demand_gemm_no_fusion_fp16<32, 4, 8, 16, 16, 16, 4, 2, 2>
-              <<<dim3(DIV_UP(out_channel, 32), DIV_UP(cur_nnz, 32), 1), dim3(8, 32, 1)>>>(
-                    cur_nnz, in_channel, out_channel, 
-                    reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()), 
-                    reinterpret_cast<half *>(kernel.data_ptr<at::Half>() 
-                        + k * in_channel * out_channel), 
-                    reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()), 
-                    &in_map_ptr[cur_idx], &out_map_ptr[cur_idx]
-                );
+            <<<dim3(DIV_UP(out_channel, 32), DIV_UP(cur_nnz, 32), 1), dim3(8, 32, 1)>>>(
+                cur_nnz, in_channel, out_channel,
+                reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
+                reinterpret_cast<half *>(kernel.data_ptr<at::Half>() + k * in_channel * out_channel),
+                reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
+                &in_map_ptr[cur_idx], &out_map_ptr[cur_idx]);
       }
-      else{
+      else
+      {
         fetch_on_demand_gemm_no_fusion_fp16_1<16, 4, 8>
-              <<<dim3(DIV_UP(out_channel, 16), DIV_UP(cur_nnz, 16), 1), dim3(16, 16, 1)>>>(
-                    cur_nnz, in_channel, out_channel, 
-                    reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()), 
-                    reinterpret_cast<half *>(kernel.data_ptr<at::Half>() 
-                        + k * in_channel * out_channel), 
-                    reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()), 
-                    &in_map_ptr[cur_idx], &out_map_ptr[cur_idx]
-                );
+            <<<dim3(DIV_UP(out_channel, 16), DIV_UP(cur_nnz, 16), 1), dim3(16, 16, 1)>>>(
+                cur_nnz, in_channel, out_channel,
+                reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
+                reinterpret_cast<half *>(kernel.data_ptr<at::Half>() + k * in_channel * out_channel),
+                reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
+                &in_map_ptr[cur_idx], &out_map_ptr[cur_idx]);
       }
     }
-    else{
-      if (in_channel % 4 == 0 && out_channel % 4 == 0){
-        if (allow_tf32){
+    else
+    {
+      if (in_channel % 4 == 0 && out_channel % 4 == 0)
+      {
+        if (allow_tf32)
+        {
           fetch_on_demand_gemm_no_fusion_tf32<32, 4, 8, 16, 8, 16, 4, 2, 2>
               <<<dim3(DIV_UP(out_channel, 32), DIV_UP(cur_nnz, 32), 1), dim3(8, 32, 1)>>>(
-                    cur_nnz, in_channel, out_channel, 
-                    in_feat.data_ptr<float>(), 
-                    (kernel.data_ptr<float>() + k * in_channel * out_channel), 
-                    out_feat.data_ptr<float>(), 
-                    &in_map_ptr[cur_idx], &out_map_ptr[cur_idx]
-                );
+                  cur_nnz, in_channel, out_channel,
+                  in_feat.data_ptr<float>(),
+                  (kernel.data_ptr<float>() + k * in_channel * out_channel),
+                  out_feat.data_ptr<float>(),
+                  &in_map_ptr[cur_idx], &out_map_ptr[cur_idx]);
         }
-        else{
+        else
+        {
           fetch_on_demand_gemm_no_fusion_fp32<32, 4, 8>
               <<<dim3(DIV_UP(out_channel, 32), DIV_UP(cur_nnz, 32), 1), dim3(8, 32, 1)>>>(
-                    cur_nnz, in_channel, out_channel, 
-                    in_feat.data_ptr<float>(), 
-                    (kernel.data_ptr<float>() + k * in_channel * out_channel), 
-                    out_feat.data_ptr<float>(), 
-                    &in_map_ptr[cur_idx], &out_map_ptr[cur_idx]
-                );
+                  cur_nnz, in_channel, out_channel,
+                  in_feat.data_ptr<float>(),
+                  (kernel.data_ptr<float>() + k * in_channel * out_channel),
+                  out_feat.data_ptr<float>(),
+                  &in_map_ptr[cur_idx], &out_map_ptr[cur_idx]);
         }
       }
-      else{
+      else
+      {
         fetch_on_demand_gemm_no_fusion_fp32_1<16, 4, 8>
-              <<<dim3(DIV_UP(out_channel, 16), DIV_UP(cur_nnz, 16), 1), dim3(16, 16, 1)>>>(
-                    cur_nnz, in_channel, out_channel, 
-                    in_feat.data_ptr<float>(), 
-                    (kernel.data_ptr<float>() + k * in_channel * out_channel), 
-                    out_feat.data_ptr<float>(), 
-                    &in_map_ptr[cur_idx], &out_map_ptr[cur_idx]
-                );
+            <<<dim3(DIV_UP(out_channel, 16), DIV_UP(cur_nnz, 16), 1), dim3(16, 16, 1)>>>(
+                cur_nnz, in_channel, out_channel,
+                in_feat.data_ptr<float>(),
+                (kernel.data_ptr<float>() + k * in_channel * out_channel),
+                out_feat.data_ptr<float>(),
+                &in_map_ptr[cur_idx], &out_map_ptr[cur_idx]);
       }
     }
 
@@ -2252,10 +2352,10 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
   }
   // precomputation only for odd channel size
   // bool precompute_mid = (input_size == output_size && k_vol % 2 == 1);
-  if (precompute_mid){
+  if (precompute_mid)
+  {
     at::addmm_out(out_feat, out_feat, in_feat, kernel[mid_kernel]);
   }
 
   return out_feat;
 }
-

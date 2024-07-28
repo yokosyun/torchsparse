@@ -1,5 +1,5 @@
 from typing import Dict
-
+import time
 import torch
 from torch.autograd import Function
 
@@ -32,7 +32,7 @@ class GatherScatterConvolutionFuntion(Function):  # TorchSparse_v2
         epsilon = config["epsilon"]
         mm_thresh = config["mm_thresh"]
 
-        conv_mode = 0
+        conv_mode = 2
         global buffer
         if torchsparse.backends.benchmark:  # type: ignore
             conv_mode = 1 if (epsilon == 0.0 and mm_thresh == 0) else 2
@@ -64,12 +64,11 @@ class GatherScatterConvolutionFuntion(Function):  # TorchSparse_v2
             if torch.float16 in [input.dtype, weight.dtype]:
                 input = input.to(torch.float16)
                 weight = weight.to(torch.float16)
-
             output = torchsparse.backend.conv_forward_gather_scatter_cuda(
                 input,
                 weight,
                 nbmaps,
-                nbsizes.cpu(),
+                nbsizes.to("cpu"),
                 input_mask,
                 output_mask,
                 sizes[1] if not transposed else sizes[0],
@@ -79,6 +78,7 @@ class GatherScatterConvolutionFuntion(Function):  # TorchSparse_v2
                 transposed,
                 buffer,
             )
+
         elif input.device.type == "cpu":
             torchsparse.backend.conv_forward_gather_scatter_cpu(
                 input, output, weight, nbmaps, nbsizes.cpu(), transposed

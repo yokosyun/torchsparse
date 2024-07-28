@@ -117,7 +117,7 @@ def test_single_layer_convolution_forward(
     kernel_size: int = 3,
     stride: int = 1,
     device="cuda:0",
-    is_half=True,
+    is_half=False,
 ):
 
     np.random.seed(0)
@@ -217,6 +217,7 @@ def test_single_layer_convolution_forward(
     mean_adiff = np.sum(np.abs(out_dense_np - ref_out_subm_np)) / ts_coords.shape[0]
     max_adiff = np.max(np.abs(out_dense_np - ref_out_subm_np))
     max_rdiff = max_adiff / np.mean(np.abs(out_dense_np))
+    print(mean_adiff, max_rdiff)
     return mean_adiff, max_rdiff
 
 

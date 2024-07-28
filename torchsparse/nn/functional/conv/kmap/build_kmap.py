@@ -1,5 +1,6 @@
 from typing import Dict, Tuple, Union
 import math
+import time
 import numpy as np
 import torch
 
@@ -81,6 +82,7 @@ def build_kernel_map(
             raise ValueError(
                 f"Unsupported kmap_mode: {mode} for generative convolution (please switch to kmap_mode=hashmap)."
             )
+
         if dataflow == Dataflow.ImplicitGEMM:
             kmap = build_kmap_implicit_GEMM_hashmap_on_the_fly(
                 kmap,
@@ -217,6 +219,7 @@ def build_kernel_map(
         kmap["reduced_sorted_mask_bwd_wgrad"] = reduced_sorted_mask_bwd_wgrad
         kmap["reduced_sorted_mask_bwd_dgrad"] = reduced_sorted_mask_bwd_dgrad
         kmap["reorder_loc_bwd"] = reorder_loc_bwd
+
     return kmap
 
 

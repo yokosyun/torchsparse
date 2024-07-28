@@ -6,6 +6,21 @@ import numpy as np
 __all__ = ["sparse_quantize"]
 
 
+# def ravel_hash(x: np.ndarray) -> np.ndarray:
+#     assert x.ndim == 2, x.shape
+
+#     x = x - np.min(x, axis=0)
+#     x = x.astype(np.uint64, copy=False)
+#     xmax = np.max(x, axis=0).astype(np.uint64) + 1
+
+#     h = np.zeros(x.shape[0], dtype=np.uint64)
+#     for k in range(x.shape[1] - 1):
+#         h += x[:, k]
+#         h *= xmax[k + 1]
+#     h += x[:, -1]
+#     return h
+
+
 def ravel_hash(x: np.ndarray) -> np.ndarray:
     assert x.ndim == 2, x.shape
 
@@ -14,10 +29,9 @@ def ravel_hash(x: np.ndarray) -> np.ndarray:
     xmax = np.max(x, axis=0).astype(np.uint64) + 1
 
     h = np.zeros(x.shape[0], dtype=np.uint64)
-    for k in range(x.shape[1] - 1):
-        h += x[:, k]
-        h *= xmax[k + 1]
-    h += x[:, -1]
+
+    # h = (x[:, 0] * xmax[1] + x[:, 1]) * xmax[2] + x[:, 2]
+    h = (x[:, 2] * xmax[1] + x[:, 1]) * xmax[0] + x[:, 0]
     return h
 
 

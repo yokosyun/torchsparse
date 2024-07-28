@@ -14,9 +14,13 @@ class Dataflow(Enum):
 _global_conv_config = None
 _default_conv_config = AttributeDict(
     [
-        ("dataflow", Dataflow.ImplicitGEMM),
-        ("ifsort", False),
-        ("kmap_mode", "hashmap_on_the_fly"),
+        # ("dataflow", Dataflow.ImplicitGEMM),
+        ("dataflow", Dataflow.GatherScatter),
+        # ("dataflow", Dataflow.FetchOnDemand),
+        # ("ifsort", False),
+        # ("ifsort", False),
+        # ("kmap_mode", "hashmap_on_the_fly"),
+        ("kmap_mode", "hashmap"),
         ("downsample_mode", "spconv"),
         ("split_mask_num", 1),
         ("split_mask_num_bwd", 3),

@@ -82,6 +82,10 @@ def build_kmap_implicit_GEMM_hashmap_on_the_fly(
 
     # update kernel_map
     out_in_map = out[0]
+
+    # results = torch.t(out_in_map).contiguous()
+    # nbsizes = torch.sum(results != -1, dim=1)
+    # print(nbsizes)
     kmap["out_in_map"] = out_in_map
     if len(out) != 1:
         coords = out[1]
@@ -137,8 +141,13 @@ def build_kmap_Gather_Scatter_hashmap_on_the_fly(
 
     results = torch.t(kmap["out_in_map"]).contiguous()
     nbsizes = torch.sum(results != -1, dim=1)
-    nbmaps = torch.nonzero(results != -1)
-    nbmaps[:, 0] = results.view(-1)[nbmaps[:, 0] * results.size(1) + nbmaps[:, 1]]
+    nbmaps = torch.nonzero(results != -1)  # [non_zero_elems, 2(weight_idx, out_idx)]
+    n_pnts = results.size(1)
+
+    nbmaps[:, 0] = results.view(-1)[
+        nbmaps[:, 0] * n_pnts + nbmaps[:, 1]
+    ]  # [non_zero_elems, 2(in_idx, out_idx)]
+
     # important for build masks
     nbmaps = nbmaps.contiguous()
     input_mask, output_mask = torchsparse.backend.build_mask_from_kmap(
@@ -148,10 +157,10 @@ def build_kmap_Gather_Scatter_hashmap_on_the_fly(
         nbsizes.int()[0 : kmap["coords"].shape[0]],
     )
 
-    kmap["nbmaps"] = nbmaps
-    kmap["nbsizes"] = nbsizes
-    kmap["input_mask"] = input_mask
-    kmap["output_mask"] = output_mask
+    kmap["nbmaps"] = nbmaps  # [non_zero_elems, 2(in_idx, out_idx)]
+    kmap["nbsizes"] = nbsizes  # [27]
+    kmap["input_mask"] = input_mask  # [27 * N_PNTS]
+    kmap["output_mask"] = output_mask  # [27 * N_PNTS]
 
     return kmap
 
@@ -195,13 +204,18 @@ def build_kmap_Fetch_on_Demand_hashmap_on_the_fly(
     torchsparse.backend.exclusive_scan_quantified_wrapper(
         kernel_volume, nbsizes, nbaddrs, qnbaddrs
     )
+    # Equivalant function. first zero is missing
+    # cum_nbsizes = torch.cumsum(nbsizes, dim=0)
+    # q = 128
+    # qnbsizes = (nbsizes + q - 1) // q * q
+    # cum_qnbsizes = torch.cumsum(qnbsizes, dim=0)
 
     # nbmaps need to be transposed for Fetch-on-Demand
     kmap["nbmaps"] = nbmaps.transpose(0, 1).int()
     kmap["nbsizes"] = nbsizes
 
-    kmap["nbaddrs"] = nbaddrs
-    kmap["qnbaddrs"] = qnbaddrs
+    kmap["nbaddrs"] = nbaddrs  # [27+1]
+    kmap["qnbaddrs"] = qnbaddrs  # [27+1]
     kmap["qmapsize"] = qnbaddrs[-1].cpu().int()
 
     return kmap
