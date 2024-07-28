@@ -17,6 +17,7 @@ from torchsparse.utils.quantize import sparse_quantize
 
 
 class RandomDataset:
+
     def __init__(self, input_size: int, voxel_size: float) -> None:
         self.input_size = input_size
         self.voxel_size = voxel_size
@@ -27,7 +28,9 @@ class RandomDataset:
 
         coords, feats = inputs[:, :3], inputs
         coords -= np.min(coords, axis=0, keepdims=True)
-        coords, indices = sparse_quantize(coords, self.voxel_size, return_index=True)
+        coords, indices = sparse_quantize(coords,
+                                          self.voxel_size,
+                                          return_index=True)
 
         coords = torch.tensor(coords, dtype=torch.int)
         feats = torch.tensor(feats[indices], dtype=torch.float)

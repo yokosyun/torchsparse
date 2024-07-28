@@ -15,6 +15,7 @@ __all__ = ["test_single_layer_convolution_forward"]
 
 
 class TestSparseConv(nn.Module):
+
     def __init__(
         self,
         num_layers,
@@ -48,11 +49,8 @@ class TestSparseConv(nn.Module):
                     stride,
                     padding,
                     dilation,
-                )
-            )
-        self.net = nn.Sequential(
-            *layers,
-        ).to(device)
+                ))
+        self.net = nn.Sequential(*layers,).to(device)
         self.shape = shape
 
     def forward(self, feats, coords):
@@ -62,6 +60,7 @@ class TestSparseConv(nn.Module):
 
 
 class TestTorchConv(nn.Module):
+
     def __init__(
         self,
         num_layers,
@@ -97,11 +96,8 @@ class TestTorchConv(nn.Module):
                     padding,
                     dilation,
                     bias=False,
-                )
-            )
-        self.net = nn.Sequential(
-            *layers,
-        ).to(device)
+                ))
+        self.net = nn.Sequential(*layers,).to(device)
         self.shape = shape
 
     def forward(self, x):
@@ -172,7 +168,8 @@ def test_single_layer_convolution_forward(
     sparse_dict = generate_feature_map(shape, num_points, IC, dtype=np_dtype)
 
     feats = np.ascontiguousarray(sparse_dict["feats"])
-    coords = np.ascontiguousarray(sparse_dict["coords"][:, [3, 0, 1, 2]])  # batch first
+    coords = np.ascontiguousarray(
+        sparse_dict["coords"][:, [3, 0, 1, 2]])  # batch first
     dense_feats = sparse_dict["dense_feats"]
 
     # print(feats)
@@ -184,14 +181,16 @@ def test_single_layer_convolution_forward(
     dense_feats_t = torch.from_numpy(dense_feats).to(torch_dtype).to(device)
 
     filters = np.random.uniform(
-        -1, 1, size=[kernel_size, kernel_size, kernel_size, IC, OC]
-    ).astype(np_dtype)
+        -1, 1, size=[kernel_size, kernel_size, kernel_size, IC,
+                     OC]).astype(np_dtype)
     filters_t = torch.from_numpy(filters).to(torch_dtype).to(device)
 
     if kernel_size % 2 == 1:
-        ref_model.net[0].weight.data[:] = filters_t.permute(4, 3, 2, 1, 0).contiguous()
+        ref_model.net[0].weight.data[:] = filters_t.permute(4, 3, 2, 1,
+                                                            0).contiguous()
     else:
-        ref_model.net[0].weight.data[:] = filters_t.permute(4, 3, 0, 1, 2).contiguous()
+        ref_model.net[0].weight.data[:] = filters_t.permute(4, 3, 0, 1,
+                                                            2).contiguous()
 
     model.net[0].kernel.data[:] = filters_t.reshape(-1, IC, OC)
 
@@ -207,14 +206,18 @@ def test_single_layer_convolution_forward(
     ref_out_np = ref_out.detach().cpu().numpy()
     ref_out_subm_np = dense_to_subm(ref_out_np, ts_coords_np)
 
-    out_dense_np = sparse_tensor_to_dense(out, ref_out_np.shape[2:], OC, dtype=np_dtype)
+    out_dense_np = sparse_tensor_to_dense(out,
+                                          ref_out_np.shape[2:],
+                                          OC,
+                                          dtype=np_dtype)
 
     # print(out.C)
     # print(out.F)
 
     # print(ref_out_np)
     # print(out_dense_np)
-    mean_adiff = np.sum(np.abs(out_dense_np - ref_out_subm_np)) / ts_coords.shape[0]
+    mean_adiff = np.sum(
+        np.abs(out_dense_np - ref_out_subm_np)) / ts_coords.shape[0]
     max_adiff = np.max(np.abs(out_dense_np - ref_out_subm_np))
     max_rdiff = max_adiff / np.mean(np.abs(out_dense_np))
     return mean_adiff, max_rdiff
@@ -239,8 +242,7 @@ if __name__ == "__main__":
         F.conv_config.set_global_conv_config(config)
         for stride in strides:
             mean_adiff, max_rdiff = test_single_layer_convolution_forward(
-                kernel_size=kernel_size, stride=stride
-            )
+                kernel_size=kernel_size, stride=stride)
             print("****************************")
             print("kernel_size, stride:", kernel_size, stride)
             print("mean_adiff, max_rdiff:", mean_adiff, max_rdiff)

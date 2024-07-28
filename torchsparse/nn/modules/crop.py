@@ -9,6 +9,7 @@ __all__ = ["SparseCrop"]
 
 
 class SparseCrop(nn.Module):
+
     def __init__(
         self,
         coords_min: Optional[Tuple[int, ...]] = None,

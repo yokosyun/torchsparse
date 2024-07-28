@@ -19,8 +19,7 @@ def set_tensor_cache_mode(mode: TensorCacheMode):
     the _global_tensor_cache must be cleared after each forward/backward
     """
     assert isinstance(
-        mode, TensorCacheMode
-    ), f"Input must be an instance of TensorCacheMode"
+        mode, TensorCacheMode), f"Input must be an instance of TensorCacheMode"
     global _tensor_cache_mode
     _tensor_cache_mode = mode
 
@@ -31,10 +30,10 @@ def get_tensor_cache_mode() -> TensorCacheMode:
 
 
 class TensorCache:
-    def __init__(
-        self,
-    ) -> None:
-        self.cmaps: Dict[Tuple[int, ...], Tuple[torch.Tensor, Tuple[int, ...]]] = {}
+
+    def __init__(self,) -> None:
+        self.cmaps: Dict[Tuple[int, ...], Tuple[torch.Tensor, Tuple[int,
+                                                                    ...]]] = {}
         self.kmaps: Dict[Tuple[Any, ...], Any] = {}
         self.hashmaps: Dict[Tuple[int, ...], Tuple[Any, ...]] = {}
 

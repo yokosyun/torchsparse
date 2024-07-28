@@ -38,14 +38,12 @@ from . import compat
 DEFAULT_RESERVED_KEY_PREFIX = "__"
 DEFAULT_RESERVED_KEY_SUFFIX = None
 
-
 # =========================================
 #       CLASSES
 # --------------------------------------
 
 
 class AttributeDict(dict):
-
     """
     :class:`~attributedict.collections.AttributeDict` is a seamlessly extended dictionary object (subclass of `dict`),
     with access to additional attribute get/set/delete of key/values.
@@ -100,7 +98,8 @@ class AttributeDict(dict):
                     is_reserved = key.startswith(reserved_key_prefix)
 
                 if len(reserved_key_suffix or ""):
-                    is_reserved = is_reserved or key.startswith(reserved_key_suffix)
+                    is_reserved = is_reserved or key.startswith(
+                        reserved_key_suffix)
 
                 if is_reserved:
                     del object[key]
@@ -367,7 +366,6 @@ __all__ = [
     "attributedict",
     "attrdict",
 ]
-
 
 # =========================================
 #       MAIN

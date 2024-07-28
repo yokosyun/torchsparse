@@ -7,9 +7,8 @@ import torchsparse.backend
 __all__ = ["sphash"]
 
 
-def sphash(
-    coords: torch.Tensor, offsets: Optional[torch.Tensor] = None
-) -> torch.Tensor:
+def sphash(coords: torch.Tensor,
+           offsets: Optional[torch.Tensor] = None) -> torch.Tensor:
     assert coords.dtype == torch.int, coords.dtype
     assert coords.ndim == 2 and coords.shape[1] == 4, coords.shape
     coords = coords.contiguous()
@@ -34,6 +33,5 @@ def sphash(
             return torchsparse.backend.kernel_hash_cpu(coords, offsets)
         else:
             device = coords.device
-            return torchsparse.backend.kernel_hash_cpu(coords.cpu(), offsets.cpu()).to(
-                device
-            )
+            return torchsparse.backend.kernel_hash_cpu(coords.cpu(),
+                                                       offsets.cpu()).to(device)

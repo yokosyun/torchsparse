@@ -32,7 +32,6 @@ import rootpath
 import sys
 import types
 
-
 # =========================================
 #       CONSTANTS
 # --------------------------------------
@@ -40,7 +39,6 @@ import types
 PY2 = sys.version_info[0] == 2
 PY3 = sys.version_info[0] == 3
 PY34 = sys.version_info[0:2] >= (3, 4)
-
 
 # =========================================
 #       VARIABLES

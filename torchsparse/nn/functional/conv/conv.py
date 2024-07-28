@@ -37,9 +37,8 @@ def conv3d(
     if config is None:
         config = F.conv_config.get_global_conv_config()
         if config is None:
-            config = F.conv_config.get_default_conv_config(
-                conv_mode=conv_mode, training=training
-            )
+            config = F.conv_config.get_default_conv_config(conv_mode=conv_mode,
+                                                           training=training)
 
     # TODO: Deal with kernel volume > 32. (Split mask or unsort)
 
@@ -54,15 +53,15 @@ def conv3d(
     elif dataflow == F.Dataflow.FetchOnDemand:
         ConvolutionFunction = FetchOnDemandConvolutionFuntion
         config.ifsort = False
-    elif (
-        dataflow == F.Dataflow.CodedCSR
-    ):  # Placeholder for PCEngine integration. Mode name can be modified.
+    elif (dataflow == F.Dataflow.CodedCSR
+         ):  # Placeholder for PCEngine integration. Mode name can be modified.
         config.ifsort = False
         assert 0, "CodedCSR has not been integrated."
     else:
         raise ValueError("unsupported dataflow: {}".format(dataflow))
 
-    if kernel_size == (1, 1, 1) and stride == (1, 1, 1) and dilation == (1, 1, 1):
+    if kernel_size == (1, 1, 1) and stride == (1, 1, 1) and dilation == (1, 1,
+                                                                         1):
         feats = feats.matmul(weight)
         if bias is not None:
             feats += bias
@@ -73,14 +72,14 @@ def conv3d(
             spatial_range=input.spatial_range,
         )
     elif not transposed:
-        kmap = input._caches.kmaps.get((input.stride, kernel_size, stride, dilation))
+        kmap = input._caches.kmaps.get(
+            (input.stride, kernel_size, stride, dilation))
 
         if kmap_mode != "hashmap_on_the_fly":
             hashmap = input._caches.hashmaps.get(input.stride)
         else:
             hashmap = input._caches.hashmaps.get(
-                tuple(input.stride[k] * stride[k] for k in range(3))
-            )
+                tuple(input.stride[k] * stride[k] for k in range(3)))
         if hashmap is None:
             hashmap_keys, hashmap_vals = None, None
         else:
@@ -109,7 +108,8 @@ def conv3d(
 
             hashmap = [kmap["hashmap_keys"], kmap["hashmap_vals"]]
 
-            input._caches.kmaps[(input.stride, kernel_size, stride, dilation)] = kmap
+            input._caches.kmaps[(input.stride, kernel_size, stride,
+                                 dilation)] = kmap
             input._caches.hashmaps[input.stride] = hashmap
 
         feats = ConvolutionFunction.apply(
@@ -132,8 +132,7 @@ def conv3d(
         tensor_stride = tuple(input.stride[k] // stride[k] for k in range(3))
         if not generative:
             kmap = input._caches.kmaps.get(
-                (tensor_stride, kernel_size, stride, dilation)
-            )
+                (tensor_stride, kernel_size, stride, dilation))
 
             kmap = F.transpose_kernel_map(
                 kmap,
@@ -204,7 +203,6 @@ def conv3d(
             input._caches.hashmaps = dict()
 
     output._caches = input._caches
-    output._caches.cmaps.setdefault(
-        output.stride, (output.coords, output.spatial_range)
-    )
+    output._caches.cmaps.setdefault(output.stride,
+                                    (output.coords, output.spatial_range))
     return output

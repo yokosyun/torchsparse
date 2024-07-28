@@ -288,18 +288,18 @@ at::Tensor conv_forward_gather_scatter_cuda(
   // not take into consideration padding!
   // if(1){
   if (conv_mode == 0) {
-    return conv_forward_gather_scatter_cuda_fallback(in_feat, kernel, neighbor_map,
-                                             output_size, conv_mode,
-                                             neighbor_offset, transpose);
+    return conv_forward_gather_scatter_cuda_fallback(
+        in_feat, kernel, neighbor_map, output_size, conv_mode, neighbor_offset,
+        transpose);
   } else if (buffer_size * (in_feat.size(1) + kernel.size(-1)) >
                  global_buffer.size(0) &&
              !in_feat.requires_grad()) {
     // std::cout << "fallback: " << buffer_size * (in_feat.size(1) +
     // out_feat.size(1)) << " " << global_buffer.size(0) << std::endl;
     //  global buffer not large enough, fall back
-    return conv_forward_gather_scatter_cuda_fallback(in_feat, kernel, neighbor_map,
-                                             output_size, conv_mode,
-                                             neighbor_offset, transpose);
+    return conv_forward_gather_scatter_cuda_fallback(
+        in_feat, kernel, neighbor_map, output_size, conv_mode, neighbor_offset,
+        transpose);
   } else {
     // std::cout << "not fallback: " << buffer_size * (in_feat.size(1) +
     // out_feat.size(1)) << " " << global_buffer.size(0) << std::endl;
@@ -812,11 +812,10 @@ at::Tensor conv_forward_gather_scatter_cuda_fallback(
   }
   return out_feat;
 }
-void conv_backward_gather_scatter_cuda(at::Tensor in_feat, at::Tensor grad_in_feat,
-                               at::Tensor grad_out_feat, at::Tensor kernel,
-                               at::Tensor grad_kernel, at::Tensor neighbor_map,
-                               at::Tensor neighbor_offset,
-                               const bool transpose) {
+void conv_backward_gather_scatter_cuda(
+    at::Tensor in_feat, at::Tensor grad_in_feat, at::Tensor grad_out_feat,
+    at::Tensor kernel, at::Tensor grad_kernel, at::Tensor neighbor_map,
+    at::Tensor neighbor_offset, const bool transpose) {
   grad_in_feat.resize_as_(in_feat);
   grad_in_feat.zero_();
   grad_kernel.resize_as_(kernel);
