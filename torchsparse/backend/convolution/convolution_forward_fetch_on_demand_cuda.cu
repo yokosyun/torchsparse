@@ -1967,9 +1967,12 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
   if (data_type_half && allow_fp16) {
     if (in_channel % 4 == 0 && out_channel % 4 == 0) {
       if (in_channel <= 16 || out_channel <= 16) {
-        fetch_on_demand_gemm_fp16_4_once<16, 4, 8>
-            <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 64), 1),
-               dim3(4, 16, 1)>>>(
+        const int BLOCK_SIZE = 16;
+        const int N_LOOP = 4;
+        fetch_on_demand_gemm_fp16_4_once<BLOCK_SIZE, N_LOOP, 8>
+            <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                    DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
+               dim3(4, BLOCK_SIZE, 1)>>>(
                 kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
                 reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
                 reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
@@ -1977,18 +1980,26 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
                 in_map_ptr, out_map_ptr);
       } else {
         if (allow_tf32) {
-          fetch_on_demand_gemm_fp16_tc4_async<32, 4, 8, 16, 16, 16, 4, 2, 2>
-              <<<dim3(DIV_UP(out_channel, 32), DIV_UP(qsum_nnz, 128), 1),
-                 dim3(8, 32, 1)>>>(
+          const int BLOCK_SIZE = 32;
+          const int N_LOOP = 4;
+          fetch_on_demand_gemm_fp16_tc4_async<32, N_LOOP, 8, 16, 16, 16, 4, 2,
+                                              2>
+              <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                      DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
+                 dim3(8, BLOCK_SIZE, 1)>>>(
                   kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
                   reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
                   reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
                   reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
                   in_map_ptr, out_map_ptr);
         } else {
-          fetch_on_demand_gemm_fp16_tc4<32, 4, 8, 16, 16, 16, 4, 2, 2>
-              <<<dim3(DIV_UP(out_channel, 32), DIV_UP(qsum_nnz, 128), 1),
-                 dim3(8, 32, 1)>>>(
+          const int BLOCK_SIZE = 32;
+          const int N_LOOP = 4;
+          fetch_on_demand_gemm_fp16_tc4<BLOCK_SIZE, N_LOOP, 8, 16, 16, 16, 4, 2,
+                                        2>
+              <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                      DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
+                 dim3(8, BLOCK_SIZE, 1)>>>(
                   kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
                   reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
                   reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
@@ -1997,18 +2008,24 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
         }
       }
     } else if (in_channel % 2 == 0 && out_channel % 2 == 0) {
-      fetch_on_demand_gemm_fp16_2<16, 8, 8>
-          <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 128), 1),
-             dim3(8, 16, 1)>>>(
+      const int BLOCK_SIZE = 16;
+      const int N_LOOP = 8;
+      fetch_on_demand_gemm_fp16_2<BLOCK_SIZE, N_LOOP, 8>
+          <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                  DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
+             dim3(8, BLOCK_SIZE, 1)>>>(
               kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
               reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
               reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
               reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
               in_map_ptr, out_map_ptr);
     } else {
-      fetch_on_demand_gemm_fp16_1<16, 4, 8>
-          <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 64), 1),
-             dim3(16, 16, 1)>>>(
+      const int BLOCK_SIZE = 16;
+      const int N_LOOP = 4;
+      fetch_on_demand_gemm_fp16_1<BLOCK_SIZE, N_LOOP, 8>
+          <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                  DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
+             dim3(16, BLOCK_SIZE, 1)>>>(
               kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
               reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
               reinterpret_cast<half *>(kernel.data_ptr<at::Half>()),
@@ -2018,40 +2035,55 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
   } else {
     if (in_channel % 4 == 0 && out_channel % 4 == 0) {
       if (in_channel <= 16 && out_channel <= 16) {
-        fetch_on_demand_gemm_fp32_once<16, 4, 8>
-            <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 64), 1),
-               dim3(4, 16, 1)>>>(
+        const int BLOCK_SIZE = 16;
+        const int N_LOOP = 4;
+        fetch_on_demand_gemm_fp32_once<BLOCK_SIZE, N_LOOP, 8>
+            <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                    DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
+               dim3(4, BLOCK_SIZE, 1)>>>(
                 kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
                 in_feat.data_ptr<float>(), kernel.data_ptr<float>(),
                 out_feat.data_ptr<float>(), in_map_ptr, out_map_ptr);
       } else {
         if (allow_tf32) {
-          fetch_on_demand_gemm_tf32<32, 4, 8, 16, 8, 16, 4, 2, 2>
-              <<<dim3(DIV_UP(out_channel, 32), DIV_UP(qsum_nnz, 128), 1),
-                 dim3(8, 32, 1)>>>(
+          const int BLOCK_SIZE = 32;
+          const int N_LOOP = 4;
+          fetch_on_demand_gemm_tf32<BLOCK_SIZE, N_LOOP, 8, 16, 8, 16, 4, 2, 2>
+              <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                      DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
+                 dim3(8, BLOCK_SIZE, 1)>>>(
                   kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
                   in_feat.data_ptr<float>(), kernel.data_ptr<float>(),
                   out_feat.data_ptr<float>(), in_map_ptr, out_map_ptr);
         } else {
-          fetch_on_demand_gemm_fp32<32, 4, 8>
-              <<<dim3(DIV_UP(out_channel, 32), DIV_UP(qsum_nnz, 128), 1),
-                 dim3(8, 32, 1)>>>(
+          const int BLOCK_SIZE = 32;
+          const int N_LOOP = 4;
+          fetch_on_demand_gemm_fp32<32, N_LOOP, 8>
+              <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                      DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
+                 dim3(8, BLOCK_SIZE, 1)>>>(
                   kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
                   in_feat.data_ptr<float>(), kernel.data_ptr<float>(),
                   out_feat.data_ptr<float>(), in_map_ptr, out_map_ptr);
         }
       }
     } else if (in_channel % 2 == 0 && out_channel % 2 == 0) {
-      fetch_on_demand_gemm_fp32_2<16, 8, 8>
-          <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 128), 1),
-             dim3(8, 16, 1)>>>(
+      const int BLOCK_SIZE = 16;
+      const int N_LOOP = 8;
+      fetch_on_demand_gemm_fp32_2<BLOCK_SIZE, N_LOOP, 8>
+          <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                  DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
+             dim3(8, BLOCK_SIZE, 1)>>>(
               kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
               in_feat.data_ptr<float>(), kernel.data_ptr<float>(),
               out_feat.data_ptr<float>(), in_map_ptr, out_map_ptr);
     } else {
-      fetch_on_demand_gemm_fp32_1<16, 4, 8>
-          <<<dim3(DIV_UP(out_channel, 16), DIV_UP(qsum_nnz, 64), 1),
-             dim3(16, 16, 1)>>>(
+      const int BLOCK_SIZE = 16;
+      const int N_LOOP = 4;
+      fetch_on_demand_gemm_fp32_1<BLOCK_SIZE, N_LOOP, 8>
+          <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                  DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
+             dim3(16, BLOCK_SIZE, 1)>>>(
               kpos_ptr, qkpos_ptr, k_vol, in_channel, out_channel,
               in_feat.data_ptr<float>(), kernel.data_ptr<float>(),
               out_feat.data_ptr<float>(), in_map_ptr, out_map_ptr);
@@ -2125,9 +2157,13 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
 
     if (data_type_half && allow_fp16) {
       if (in_channel % 4 == 0 && out_channel % 4 == 0) {
-        fetch_on_demand_gemm_no_fusion_fp16<32, 4, 8, 16, 16, 16, 4, 2, 2>
-            <<<dim3(DIV_UP(out_channel, 32), DIV_UP(cur_nnz, 32), 1),
-               dim3(8, 32, 1)>>>(
+        const int BLOCK_SIZE = 32;
+        const int N_LOOP = 4;
+        fetch_on_demand_gemm_no_fusion_fp16<BLOCK_SIZE, N_LOOP, 8, 16, 16, 16,
+                                            4, 2, 2>
+            <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                    DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
+               dim3(8, BLOCK_SIZE, 1)>>>(
                 cur_nnz, in_channel, out_channel,
                 reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
                 reinterpret_cast<half *>(kernel.data_ptr<at::Half>() +
@@ -2135,9 +2171,12 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
                 reinterpret_cast<half *>(out_feat.data_ptr<at::Half>()),
                 &in_map_ptr[cur_idx], &out_map_ptr[cur_idx]);
       } else {
-        fetch_on_demand_gemm_no_fusion_fp16_1<16, 4, 8>
-            <<<dim3(DIV_UP(out_channel, 16), DIV_UP(cur_nnz, 16), 1),
-               dim3(16, 16, 1)>>>(
+        const int BLOCK_SIZE = 16;
+        const int N_LOOP = 4;
+        fetch_on_demand_gemm_no_fusion_fp16_1<BLOCK_SIZE, N_LOOP, 8>
+            <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                    DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
+               dim3(16, BLOCK_SIZE, 1)>>>(
                 cur_nnz, in_channel, out_channel,
                 reinterpret_cast<half *>(in_feat.data_ptr<at::Half>()),
                 reinterpret_cast<half *>(kernel.data_ptr<at::Half>() +
@@ -2148,26 +2187,36 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
     } else {
       if (in_channel % 4 == 0 && out_channel % 4 == 0) {
         if (allow_tf32) {
-          fetch_on_demand_gemm_no_fusion_tf32<32, 4, 8, 16, 8, 16, 4, 2, 2>
-              <<<dim3(DIV_UP(out_channel, 32), DIV_UP(cur_nnz, 32), 1),
-                 dim3(8, 32, 1)>>>(
+          const int BLOCK_SIZE = 32;
+          const int N_LOOP = 4;
+          fetch_on_demand_gemm_no_fusion_tf32<BLOCK_SIZE, N_LOOP, 8, 16, 8, 16,
+                                              4, 2, 2>
+              <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                      DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
+                 dim3(8, BLOCK_SIZE, 1)>>>(
                   cur_nnz, in_channel, out_channel, in_feat.data_ptr<float>(),
                   (kernel.data_ptr<float>() + k * in_channel * out_channel),
                   out_feat.data_ptr<float>(), &in_map_ptr[cur_idx],
                   &out_map_ptr[cur_idx]);
         } else {
-          fetch_on_demand_gemm_no_fusion_fp32<32, 4, 8>
-              <<<dim3(DIV_UP(out_channel, 32), DIV_UP(cur_nnz, 32), 1),
-                 dim3(8, 32, 1)>>>(
+          const int BLOCK_SIZE = 32;
+          const int N_LOOP = 4;
+          fetch_on_demand_gemm_no_fusion_fp32<BLOCK_SIZE, N_LOOP, 8>
+              <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                      DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
+                 dim3(8, BLOCK_SIZE, 1)>>>(
                   cur_nnz, in_channel, out_channel, in_feat.data_ptr<float>(),
                   (kernel.data_ptr<float>() + k * in_channel * out_channel),
                   out_feat.data_ptr<float>(), &in_map_ptr[cur_idx],
                   &out_map_ptr[cur_idx]);
         }
       } else {
-        fetch_on_demand_gemm_no_fusion_fp32_1<16, 4, 8>
-            <<<dim3(DIV_UP(out_channel, 16), DIV_UP(cur_nnz, 16), 1),
-               dim3(16, 16, 1)>>>(
+        const int BLOCK_SIZE = 16;
+        const int N_LOOP = 4;
+        fetch_on_demand_gemm_no_fusion_fp32_1<BLOCK_SIZE, N_LOOP, 8>
+            <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
+                    DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
+               dim3(16, BLOCK_SIZE, 1)>>>(
                 cur_nnz, in_channel, out_channel, in_feat.data_ptr<float>(),
                 (kernel.data_ptr<float>() + k * in_channel * out_channel),
                 out_feat.data_ptr<float>(), &in_map_ptr[cur_idx],
