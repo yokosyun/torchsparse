@@ -1965,12 +1965,13 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
   // printf("%d", qsum_nnz);
   const int LOAD_4_ELMS = 4;
   const int LOAD_2_ELMS = 2;
+  const int SKEW = 8;
   if (data_type_half && allow_fp16) {
     if (in_channel % 4 == 0 && out_channel % 4 == 0) {
       if (in_channel <= 16 || out_channel <= 16) {
         const int BLOCK_SIZE = 16;
         const int N_LOOP = 4;
-        fetch_on_demand_gemm_fp16_4_once<BLOCK_SIZE, N_LOOP, 8>
+        fetch_on_demand_gemm_fp16_4_once<BLOCK_SIZE, N_LOOP, SKEW>
             <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                     DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
                dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
@@ -1983,8 +1984,8 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
         if (allow_tf32) {
           const int BLOCK_SIZE = 32;
           const int N_LOOP = 4;
-          fetch_on_demand_gemm_fp16_tc4_async<BLOCK_SIZE, N_LOOP, 8, 16, 16, 16,
-                                              4, 2, 2>
+          fetch_on_demand_gemm_fp16_tc4_async<BLOCK_SIZE, N_LOOP, SKEW, 16, 16,
+                                              16, 4, 2, 2>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
                  dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
@@ -1996,8 +1997,8 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
         } else {
           const int BLOCK_SIZE = 32;
           const int N_LOOP = 4;
-          fetch_on_demand_gemm_fp16_tc4<BLOCK_SIZE, N_LOOP, 8, 16, 16, 16, 4, 2,
-                                        2>
+          fetch_on_demand_gemm_fp16_tc4<BLOCK_SIZE, N_LOOP, SKEW, 16, 16, 16, 4,
+                                        2, 2>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
                  dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
@@ -2011,7 +2012,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
     } else if (in_channel % 2 == 0 && out_channel % 2 == 0) {
       const int BLOCK_SIZE = 16;
       const int N_LOOP = 8;
-      fetch_on_demand_gemm_fp16_2<BLOCK_SIZE, N_LOOP, 8>
+      fetch_on_demand_gemm_fp16_2<BLOCK_SIZE, N_LOOP, SKEW>
           <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                   DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
              dim3(BLOCK_SIZE / LOAD_2_ELMS, BLOCK_SIZE, 1)>>>(
@@ -2023,7 +2024,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
     } else {
       const int BLOCK_SIZE = 16;
       const int N_LOOP = 4;
-      fetch_on_demand_gemm_fp16_1<BLOCK_SIZE, N_LOOP, 8>
+      fetch_on_demand_gemm_fp16_1<BLOCK_SIZE, N_LOOP, SKEW>
           <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                   DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
              dim3(BLOCK_SIZE, BLOCK_SIZE, 1)>>>(
@@ -2038,7 +2039,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
       if (in_channel <= 16 && out_channel <= 16) {
         const int BLOCK_SIZE = 16;
         const int N_LOOP = 4;
-        fetch_on_demand_gemm_fp32_once<BLOCK_SIZE, N_LOOP, 8>
+        fetch_on_demand_gemm_fp32_once<BLOCK_SIZE, N_LOOP, SKEW>
             <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                     DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
                dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
@@ -2049,7 +2050,8 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
         if (allow_tf32) {
           const int BLOCK_SIZE = 32;
           const int N_LOOP = 4;
-          fetch_on_demand_gemm_tf32<BLOCK_SIZE, N_LOOP, 8, 16, 8, 16, 4, 2, 2>
+          fetch_on_demand_gemm_tf32<BLOCK_SIZE, N_LOOP, SKEW, 16, 8, 16, 4, 2,
+                                    2>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
                  dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
@@ -2059,7 +2061,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
         } else {
           const int BLOCK_SIZE = 32;
           const int N_LOOP = 4;
-          fetch_on_demand_gemm_fp32<32, N_LOOP, 8>
+          fetch_on_demand_gemm_fp32<32, N_LOOP, SKEW>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
                  dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
@@ -2071,7 +2073,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
     } else if (in_channel % 2 == 0 && out_channel % 2 == 0) {
       const int BLOCK_SIZE = 16;
       const int N_LOOP = 8;
-      fetch_on_demand_gemm_fp32_2<BLOCK_SIZE, N_LOOP, 8>
+      fetch_on_demand_gemm_fp32_2<BLOCK_SIZE, N_LOOP, SKEW>
           <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                   DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
              dim3(BLOCK_SIZE / LOAD_2_ELMS, BLOCK_SIZE, 1)>>>(
@@ -2081,7 +2083,7 @@ at::Tensor conv_forward_fetch_on_demand_cuda(
     } else {
       const int BLOCK_SIZE = 16;
       const int N_LOOP = 4;
-      fetch_on_demand_gemm_fp32_1<BLOCK_SIZE, N_LOOP, 8>
+      fetch_on_demand_gemm_fp32_1<BLOCK_SIZE, N_LOOP, SKEW>
           <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                   DIV_UP(qsum_nnz, BLOCK_SIZE * N_LOOP), 1),
              dim3(BLOCK_SIZE, BLOCK_SIZE, 1)>>>(
@@ -2147,6 +2149,7 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
   int cur_idx = 0;
   // int stream_id = 0;
   const int LOAD_4_ELMS = 4;
+  const int SKEW = 8;
   for (int k = 0; k < k_vol; k++) {
     int cur_nnz = knnz_ptr[k];
 
@@ -2161,8 +2164,8 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
       if (in_channel % 4 == 0 && out_channel % 4 == 0) {
         const int BLOCK_SIZE = 32;
         const int N_LOOP = 4;
-        fetch_on_demand_gemm_no_fusion_fp16<BLOCK_SIZE, N_LOOP, 8, 16, 16, 16,
-                                            4, 2, 2>
+        fetch_on_demand_gemm_no_fusion_fp16<BLOCK_SIZE, N_LOOP, SKEW, 16, 16,
+                                            16, 4, 2, 2>
             <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                     DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
                dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
@@ -2175,7 +2178,7 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
       } else {
         const int BLOCK_SIZE = 16;
         const int N_LOOP = 4;
-        fetch_on_demand_gemm_no_fusion_fp16_1<BLOCK_SIZE, N_LOOP, 8>
+        fetch_on_demand_gemm_no_fusion_fp16_1<BLOCK_SIZE, N_LOOP, SKEW>
             <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                     DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
                dim3(BLOCK_SIZE, BLOCK_SIZE, 1)>>>(
@@ -2191,8 +2194,8 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
         if (allow_tf32) {
           const int BLOCK_SIZE = 32;
           const int N_LOOP = 4;
-          fetch_on_demand_gemm_no_fusion_tf32<BLOCK_SIZE, N_LOOP, 8, 16, 8, 16,
-                                              4, 2, 2>
+          fetch_on_demand_gemm_no_fusion_tf32<BLOCK_SIZE, N_LOOP, SKEW, 16, 8,
+                                              16, 4, 2, 2>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
                  dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
@@ -2203,7 +2206,7 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
         } else {
           const int BLOCK_SIZE = 32;
           const int N_LOOP = 4;
-          fetch_on_demand_gemm_no_fusion_fp32<BLOCK_SIZE, N_LOOP, 8>
+          fetch_on_demand_gemm_no_fusion_fp32<BLOCK_SIZE, N_LOOP, SKEW>
               <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                       DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
                  dim3(BLOCK_SIZE / LOAD_4_ELMS, BLOCK_SIZE, 1)>>>(
@@ -2215,7 +2218,7 @@ at::Tensor conv_forward_fetch_on_demand_no_fusion_cuda(
       } else {
         const int BLOCK_SIZE = 16;
         const int N_LOOP = 4;
-        fetch_on_demand_gemm_no_fusion_fp32_1<BLOCK_SIZE, N_LOOP, 8>
+        fetch_on_demand_gemm_no_fusion_fp32_1<BLOCK_SIZE, N_LOOP, SKEW>
             <<<dim3(DIV_UP(out_channel, BLOCK_SIZE),
                     DIV_UP(cur_nnz, BLOCK_SIZE * N_LOOP), 1),
                dim3(BLOCK_SIZE, BLOCK_SIZE, 1)>>>(
