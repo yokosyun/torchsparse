@@ -94,8 +94,6 @@ def dummy_train_3x3(device):
     feed_dict = generate_batched_random_point_clouds(size=NUM_PC,
                                                      voxel_size=VOXEL_SIZE)
 
-    torchsparse.backends.benchmark = False
-
     with torch.no_grad():
         if False:
             with torch.profiler.profile(
