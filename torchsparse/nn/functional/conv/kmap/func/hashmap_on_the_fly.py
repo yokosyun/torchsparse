@@ -81,9 +81,9 @@ def build_kmap_implicit_GEMM_hashmap_on_the_fly(
     # update kernel_map
     out_in_map = out[0]
 
-    # out_in_map = torch.roll(out_in_map, shifts=9, dims = 1)
+    out_in_map = torch.roll(out_in_map, shifts=9, dims=1)
     # out_in_map = out_in_map[:, :18]
-    # out_in_map = out_in_map[:, 18:]
+    out_in_map = out_in_map[:, 18:]
     # print("-----------------------------")
     # print(out_in_map.shape, input_node_num,coords.shape[0] )
 

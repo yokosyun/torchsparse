@@ -112,9 +112,9 @@ def conv3d(
                                  dilation)] = kmap
             input._caches.hashmaps[input.stride] = hashmap
 
-        # weight = torch.roll(weight, shifts=9, dims = 0)
+        weight = torch.roll(weight, shifts=9, dims=0)
         # weight = weight[:18,:,:]
-        # weight = weight[18:,:,:]
+        weight = weight[18:, :, :]
 
         feats = ConvolutionFunction.apply(
             feats,
