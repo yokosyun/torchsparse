@@ -80,6 +80,13 @@ def build_kmap_implicit_GEMM_hashmap_on_the_fly(
 
     # update kernel_map
     out_in_map = out[0]
+
+    # out_in_map = torch.roll(out_in_map, shifts=9, dims = 1)
+    # out_in_map = out_in_map[:, :18]
+    # out_in_map = out_in_map[:, 18:]
+    # print("-----------------------------")
+    # print(out_in_map.shape, input_node_num,coords.shape[0] )
+
     kmap["out_in_map"] = out_in_map
     if len(out) != 1:
         coords = out[1]
@@ -204,4 +211,5 @@ def build_kmap_Fetch_on_Demand_hashmap_on_the_fly(
     kmap["qnbaddrs"] = qnbaddrs
     kmap["qmapsize"] = qnbaddrs[-1].cpu().int()
 
+    # print(nbsizes, kmap["qmapsize"])
     return kmap
