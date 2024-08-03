@@ -13,7 +13,6 @@ class SparseConvTestCase(unittest.TestCase):
         # kernel_sizes = [2, 3, 5]
         kernel_sizes = [3]
         strides = [1, 2]
-        torchsparse.backends.benchmark = False  # need for GatherScatter mode2
 
         config = F.conv_config.get_default_conv_config()
         config.kmap_mode = "hashmap"

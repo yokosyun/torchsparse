@@ -33,7 +33,7 @@ class GatherScatterConvolutionFuntion(Function):  # TorchSparse_v2
         epsilon = config["epsilon"]
         mm_thresh = config["mm_thresh"]
 
-        conv_mode = 0
+        conv_mode = config["conv_mode"]
         global buffer
         if torchsparse.backends.benchmark:  # type: ignore
             conv_mode = 1 if (epsilon == 0.0 and mm_thresh == 0) else 2

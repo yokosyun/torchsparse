@@ -14,9 +14,10 @@ class Dataflow(Enum):
 _global_conv_config = None
 _default_conv_config = AttributeDict([
     # ("dataflow", Dataflow.ImplicitGEMM),
-    # ("dataflow", Dataflow.GatherScatter), # mode 2 is not working. IndexError: select(): index 27 out of range for tensor of size [27, 16, 32] at dimension 0
-    ("dataflow", Dataflow.FetchOnDemand),
-    ("ifsort", False),
+    ("dataflow", Dataflow.GatherScatter),
+    # ("dataflow", Dataflow.FetchOnDemand),
+    ("conv_mode", 2),  # torchsparse/backends.py benchmark=True
+    ("ifsort", True),
     ("kmap_mode", "hashmap_on_the_fly"),
     ("downsample_mode", "spconv"),
     ("split_mask_num", 1),
