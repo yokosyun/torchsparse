@@ -79,8 +79,7 @@ class FetchImplicitConvolutionFuntion(Function):
 
             weight = torch.roll(weight, shifts=9, dims=0)
             weight_fod = weight[:18, :, :]
-            # weight_implicit = weight[18:, :, :]
-            weight_implicit = weight
+            weight_implicit = weight[18:, :, :]
 
             if config["FOD_fusion"] == True:
                 fod_output = torchsparse.backend.conv_forward_fetch_on_demand_cuda(
@@ -139,13 +138,9 @@ class FetchImplicitConvolutionFuntion(Function):
             num_out_feats = sizes[1] if not transposed else sizes[0]
             num_out_channels = weight_implicit.shape[-1]
 
-            weight_implicit_1 = weight[18:, :, :]
-            weight_implicit_2 = weight[:18, :, :]
-            reorder_out_in_map_1 = reorder_out_in_map[:, 18:]
-            reorder_out_in_map_2 = reorder_out_in_map[:, :18]
-
             if not ifsort:
-                output = torchsparse.backend.conv_forward_implicit_gemm_cuda(
+                assert False, "ifsort = False is not supported"
+                output_implicit = torchsparse.backend.conv_forward_implicit_gemm_cuda(
                     input,
                     weight,
                     out_in_map,
@@ -155,33 +150,10 @@ class FetchImplicitConvolutionFuntion(Function):
                     torchsparse.backends.allow_fp16,
                 )
             else:
-                # output = torchsparse.backend.conv_forward_implicit_gemm_sorted_cuda(
-                #     input,
-                #     weight,
-                #     reorder_out_in_map,
-                #     reduced_sorted_mask,
-                #     reorder_loc,
-                #     num_out_feats,
-                #     num_out_channels,
-                #     torchsparse.backends.allow_tf32,
-                #     torchsparse.backends.allow_fp16,
-                # )
-                output_1 = torchsparse.backend.conv_forward_implicit_gemm_sorted_cuda(
+                output_implicit = torchsparse.backend.conv_forward_implicit_gemm_sorted_cuda(
                     input,
-                    weight_implicit_1.contiguous(),
-                    reorder_out_in_map_1.contiguous(),
-                    reduced_sorted_mask,
-                    reorder_loc,
-                    num_out_feats,
-                    num_out_channels,
-                    torchsparse.backends.allow_tf32,
-                    torchsparse.backends.allow_fp16,
-                )
-
-                output_2 = torchsparse.backend.conv_forward_implicit_gemm_sorted_cuda(
-                    input,
-                    weight_implicit_2.contiguous(),
-                    reorder_out_in_map_2.contiguous(),
+                    weight_implicit.contiguous(),
+                    reorder_out_in_map.contiguous(),
                     reduced_sorted_mask,
                     reorder_loc,
                     num_out_feats,
@@ -193,7 +165,7 @@ class FetchImplicitConvolutionFuntion(Function):
         else:
             raise NotImplementedError
 
-        output = output_1 + fod_output
+        output = fod_output + output_implicit
 
         ctx.for_backwards = (input, weight, nbmaps, nbsizes, transposed)
         return output.to(weight.dtype)
