@@ -80,11 +80,7 @@ class FetchImplicitConvolutionFuntion(Function):
             weight = torch.roll(weight, shifts=9, dims=0)
             weight_fod = weight[:18, :, :]
             # weight_implicit = weight[18:, :, :]
-            weight_fod = weight
             weight_implicit = weight
-
-            print(nbmaps.shape)
-            print(mapsize)
 
             if config["FOD_fusion"] == True:
                 fod_output = torchsparse.backend.conv_forward_fetch_on_demand_cuda(
@@ -194,13 +190,10 @@ class FetchImplicitConvolutionFuntion(Function):
                     torchsparse.backends.allow_fp16,
                 )
 
-                output = output_1 + output_2
         else:
             raise NotImplementedError
 
-        # print(nbaddrs,reorder_out_in_map.shape)
-        # print(fod_output.shape, output.shape)
-        # output = fod_output
+        output = output_1 + fod_output
 
         ctx.for_backwards = (input, weight, nbmaps, nbsizes, transposed)
         return output.to(weight.dtype)

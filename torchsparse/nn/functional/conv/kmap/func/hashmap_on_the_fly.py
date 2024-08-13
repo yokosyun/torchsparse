@@ -115,9 +115,8 @@ def build_kmap_fetch_implicit_hashmap_on_the_fly(
     out_in_map = kmap["out_in_map"]
 
     out_in_map = torch.roll(out_in_map, shifts=9, dims=1)
-    # out_in_map_fetch = out_in_map[:, :18]
-    # out_in_map_implicit = out_in_map[:, 18:]
-    out_in_map_fetch = out_in_map
+    out_in_map_fetch = out_in_map[:, :18].contiguous()
+    # out_in_map_implicit = out_in_map[:, 18:].contiguous()
     out_in_map_implicit = out_in_map
 
     # Fetch On Demand
