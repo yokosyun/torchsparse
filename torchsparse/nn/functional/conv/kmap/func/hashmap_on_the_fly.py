@@ -74,9 +74,9 @@ def build_kmap_hashmap_on_the_fly(
         padding,
         to_insert,
     )
-
     # update kernel_map
     out_in_map = out[0]
+
     kmap["out_in_map"] = out_in_map
     if len(out) != 1:
         coords = out[1]
@@ -115,8 +115,10 @@ def build_kmap_fetch_implicit_hashmap_on_the_fly(
     out_in_map = kmap["out_in_map"]
 
     out_in_map = torch.roll(out_in_map, shifts=9, dims=1)
-    out_in_map_fetch = out_in_map[:, :18]
-    out_in_map_implicit = out_in_map[:, 18:]
+    # out_in_map_fetch = out_in_map[:, :18]
+    # out_in_map_implicit = out_in_map[:, 18:]
+    out_in_map_fetch = out_in_map
+    out_in_map_implicit = out_in_map
 
     # Fetch On Demand
     results = torch.t(out_in_map_fetch).contiguous()

@@ -79,12 +79,17 @@ class FetchImplicitConvolutionFuntion(Function):
 
             weight = torch.roll(weight, shifts=9, dims=0)
             weight_fod = weight[:18, :, :]
-            weight_implicit = weight[18:, :, :]
+            # weight_implicit = weight[18:, :, :]
+            weight_fod = weight
+            weight_implicit = weight
+
+            print(nbmaps.shape)
+            print(mapsize)
 
             if config["FOD_fusion"] == True:
                 fod_output = torchsparse.backend.conv_forward_fetch_on_demand_cuda(
                     input,
-                    weight_fod,
+                    weight_fod.contiguous(),
                     nbmaps,
                     mapsize,
                     nbaddrs,
@@ -110,7 +115,7 @@ class FetchImplicitConvolutionFuntion(Function):
                               ))
 
             if not transposed:
-                # out_in_map = kmap["out_in_map"]
+                out_in_map = kmap["out_in_map"]
                 reorder_out_in_map = kmap["reorder_out_in_map"]
                 reduced_sorted_mask = kmap["reduced_sorted_mask"]
                 reorder_loc = kmap["reorder_loc"]
@@ -138,10 +143,15 @@ class FetchImplicitConvolutionFuntion(Function):
             num_out_feats = sizes[1] if not transposed else sizes[0]
             num_out_channels = weight_implicit.shape[-1]
 
+            weight_implicit_1 = weight[18:, :, :]
+            weight_implicit_2 = weight[:18, :, :]
+            reorder_out_in_map_1 = reorder_out_in_map[:, 18:]
+            reorder_out_in_map_2 = reorder_out_in_map[:, :18]
+
             if not ifsort:
                 output = torchsparse.backend.conv_forward_implicit_gemm_cuda(
                     input,
-                    weight_implicit,
+                    weight,
                     out_in_map,
                     num_out_feats,
                     num_out_channels,
@@ -149,10 +159,21 @@ class FetchImplicitConvolutionFuntion(Function):
                     torchsparse.backends.allow_fp16,
                 )
             else:
-                output = torchsparse.backend.conv_forward_implicit_gemm_sorted_cuda(
+                # output = torchsparse.backend.conv_forward_implicit_gemm_sorted_cuda(
+                #     input,
+                #     weight,
+                #     reorder_out_in_map,
+                #     reduced_sorted_mask,
+                #     reorder_loc,
+                #     num_out_feats,
+                #     num_out_channels,
+                #     torchsparse.backends.allow_tf32,
+                #     torchsparse.backends.allow_fp16,
+                # )
+                output_1 = torchsparse.backend.conv_forward_implicit_gemm_sorted_cuda(
                     input,
-                    weight_implicit,
-                    reorder_out_in_map,
+                    weight_implicit_1.contiguous(),
+                    reorder_out_in_map_1.contiguous(),
                     reduced_sorted_mask,
                     reorder_loc,
                     num_out_feats,
@@ -160,11 +181,26 @@ class FetchImplicitConvolutionFuntion(Function):
                     torchsparse.backends.allow_tf32,
                     torchsparse.backends.allow_fp16,
                 )
+
+                output_2 = torchsparse.backend.conv_forward_implicit_gemm_sorted_cuda(
+                    input,
+                    weight_implicit_2.contiguous(),
+                    reorder_out_in_map_2.contiguous(),
+                    reduced_sorted_mask,
+                    reorder_loc,
+                    num_out_feats,
+                    num_out_channels,
+                    torchsparse.backends.allow_tf32,
+                    torchsparse.backends.allow_fp16,
+                )
+
+                output = output_1 + output_2
         else:
             raise NotImplementedError
 
+        # print(nbaddrs,reorder_out_in_map.shape)
         # print(fod_output.shape, output.shape)
-        output += fod_output
+        # output = fod_output
 
         ctx.for_backwards = (input, weight, nbmaps, nbsizes, transposed)
         return output.to(weight.dtype)
