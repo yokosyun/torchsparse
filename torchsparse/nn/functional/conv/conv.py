@@ -11,6 +11,8 @@ from .func import *
 
 __all__ = ["conv3d"]
 
+import time
+
 
 def conv3d(
     input: SparseTensor,
@@ -53,6 +55,8 @@ def conv3d(
     elif dataflow == F.Dataflow.FetchOnDemand:
         ConvolutionFunction = FetchOnDemandConvolutionFuntion
         config.ifsort = False
+    elif dataflow == F.Dataflow.FetchImplicit:
+        ConvolutionFunction = FetchImplicitConvolutionFuntion
     elif (dataflow == F.Dataflow.CodedCSR
          ):  # Placeholder for PCEngine integration. Mode name can be modified.
         config.ifsort = False
@@ -88,6 +92,7 @@ def conv3d(
         spatial_range = input.spatial_range
 
         if kmap is None:
+            # start_time = time.time()
             kmap = F.build_kernel_map(
                 coords,
                 feats.shape[0],
@@ -112,9 +117,8 @@ def conv3d(
                                  dilation)] = kmap
             input._caches.hashmaps[input.stride] = hashmap
 
-        weight = torch.roll(weight, shifts=9, dims=0)
-        # weight = weight[:18,:,:]
-        weight = weight[18:, :, :]
+            # end_time = time.time()
+            # print((end_time - start_time)*1000)
 
         feats = ConvolutionFunction.apply(
             feats,

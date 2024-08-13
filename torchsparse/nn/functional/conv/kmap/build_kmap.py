@@ -120,6 +120,20 @@ def build_kernel_map(
                 cta_M=cta_M,
                 subm=subm,
             )
+        elif dataflow == Dataflow.FetchImplicit:
+            kmap = build_kmap_fetch_implicit_hashmap_on_the_fly(
+                kmap,
+                input_node_num,
+                _coords,
+                kernel_size,
+                stride,
+                padding=padding,
+                spatial_range=new_spatial_range,
+                cta_M=cta_M,
+                subm=subm,
+                ifsort=ifsort,
+                split_mask_num=split_mask_num,
+            )
 
         else:
             raise ValueError(
@@ -173,7 +187,6 @@ def build_kernel_map(
                 downsample_mode=downsample_mode,
                 generative=generative,
             )
-
         else:
             raise ValueError(
                 "[Build kernel map] unsupported dataflow: {}".format(dataflow))
@@ -210,6 +223,7 @@ def build_kernel_map(
         kmap["reduced_sorted_mask_bwd_wgrad"] = reduced_sorted_mask_bwd_wgrad
         kmap["reduced_sorted_mask_bwd_dgrad"] = reduced_sorted_mask_bwd_dgrad
         kmap["reorder_loc_bwd"] = reorder_loc_bwd
+
     return kmap
 
 

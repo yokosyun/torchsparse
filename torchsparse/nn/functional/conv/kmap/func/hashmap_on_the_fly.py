@@ -7,7 +7,7 @@ import torchsparse.backends
 from torchsparse.utils import make_tensor
 
 
-def build_kmap_implicit_GEMM_hashmap_on_the_fly(
+def build_kmap_hashmap_on_the_fly(
     kmap: Dict,
     input_node_num: int,
     _coords: torch.Tensor,
@@ -15,11 +15,8 @@ def build_kmap_implicit_GEMM_hashmap_on_the_fly(
     stride: torch.Tensor,
     padding: torch.Tensor,
     spatial_range: Optional[Tuple[int]] = None,
-    cta_M: int = 128,
     subm: bool = False,
-    ifsort: bool = False,
-    split_mask_num: int = 1,
-) -> Dict:
+):
     kmap["coords"] = _coords
     kmap["spatial_range"] = spatial_range
     # coords = _coords[:, [3, 0, 1, 2]]
@@ -80,13 +77,6 @@ def build_kmap_implicit_GEMM_hashmap_on_the_fly(
 
     # update kernel_map
     out_in_map = out[0]
-
-    out_in_map = torch.roll(out_in_map, shifts=9, dims=1)
-    # out_in_map = out_in_map[:, :18]
-    out_in_map = out_in_map[:, 18:]
-    # print("-----------------------------")
-    # print(out_in_map.shape, input_node_num,coords.shape[0] )
-
     kmap["out_in_map"] = out_in_map
     if len(out) != 1:
         coords = out[1]
@@ -94,7 +84,112 @@ def build_kmap_implicit_GEMM_hashmap_on_the_fly(
         kmap["coords"] = coords
     kmap["sizes"] = (input_node_num, coords.shape[0])
 
+    return kmap
+
+
+def build_kmap_fetch_implicit_hashmap_on_the_fly(
+    kmap: Dict,
+    input_node_num: int,
+    _coords: torch.Tensor,
+    kernel_size: torch.Tensor,
+    stride: torch.Tensor,
+    padding: torch.Tensor,
+    spatial_range: Optional[Tuple[int]] = None,
+    cta_M: int = 128,
+    subm: bool = False,
+    ifsort: bool = False,
+    split_mask_num: int = 1,
+) -> Dict:
+
+    kmap = build_kmap_hashmap_on_the_fly(
+        kmap,
+        input_node_num,
+        _coords,
+        kernel_size,
+        stride,
+        padding,
+        spatial_range=spatial_range,
+        subm=subm,
+    )
+
+    out_in_map = kmap["out_in_map"]
+
+    out_in_map = torch.roll(out_in_map, shifts=9, dims=1)
+    out_in_map_fetch = out_in_map[:, :18]
+    out_in_map_implicit = out_in_map[:, 18:]
+
+    # Fetch On Demand
+    results = torch.t(out_in_map_fetch).contiguous()
+    nbsizes = torch.sum(results != -1, dim=1).to(torch.int)
+    nbmaps = torch.nonzero(results != -1)
+    nbmaps[:,
+           0] = results.view(-1)[nbmaps[:, 0] * results.size(1) + nbmaps[:, 1]]
+
+    kernel_volume = nbsizes.size(0)
+    nbaddrs = torch.zeros((kernel_volume + 1),
+                          dtype=torch.int,
+                          device=nbmaps.device)
+    qnbaddrs = torch.zeros((kernel_volume + 1),
+                           dtype=torch.int,
+                           device=nbmaps.device)
+
+    # Derive quantified arrays
+    torchsparse.backend.exclusive_scan_quantified_wrapper(
+        kernel_volume, nbsizes, nbaddrs, qnbaddrs)
+
+    # nbmaps need to be transposed for Fetch-on-Demand
+    kmap["nbmaps"] = nbmaps.transpose(0, 1).int()
+    kmap["nbsizes"] = nbsizes
+
+    kmap["nbaddrs"] = nbaddrs
+    kmap["qnbaddrs"] = qnbaddrs
+    kmap["qmapsize"] = qnbaddrs[-1].cpu().int()
+
+    # Implicit GEMM
     if ifsort:
+        bitmask = torchsparse.backend.derive_bitmask_from_out_in_map(
+            out_in_map_implicit, split_mask_num, kmap["sizes"][1])
+        sorted_mask, reorder_loc = torch.sort(bitmask, descending=True)
+        reorder_loc = reorder_loc.to(torch.int32)
+        reorder_out_in_map = torchsparse.backend.reorder_out_in_map_cuda(
+            out_in_map_implicit, reorder_loc)
+        reduced_sorted_mask = torchsparse.backend.reduce_bitmask_cuda(
+            sorted_mask, cta_M)
+        kmap["reorder_out_in_map"] = reorder_out_in_map
+        kmap["reduced_sorted_mask"] = reduced_sorted_mask
+        kmap["reorder_loc"] = reorder_loc
+        kmap["sorted_mask"] = sorted_mask
+
+    return kmap
+
+
+def build_kmap_implicit_GEMM_hashmap_on_the_fly(
+    kmap: Dict,
+    input_node_num: int,
+    _coords: torch.Tensor,
+    kernel_size: torch.Tensor,
+    stride: torch.Tensor,
+    padding: torch.Tensor,
+    spatial_range: Optional[Tuple[int]] = None,
+    cta_M: int = 128,
+    subm: bool = False,
+    ifsort: bool = False,
+    split_mask_num: int = 1,
+) -> Dict:
+
+    kmap = build_kmap_hashmap_on_the_fly(
+        kmap,
+        input_node_num,
+        _coords,
+        kernel_size,
+        stride,
+        padding,
+        spatial_range=spatial_range,
+        subm=subm,
+    )
+
+    if ifsort:
+        out_in_map = kmap["out_in_map"]
         bitmask = torchsparse.backend.derive_bitmask_from_out_in_map(
             out_in_map, split_mask_num, kmap["sizes"][1])
         sorted_mask, reorder_loc = torch.sort(bitmask, descending=True)
@@ -211,5 +306,4 @@ def build_kmap_Fetch_on_Demand_hashmap_on_the_fly(
     kmap["qnbaddrs"] = qnbaddrs
     kmap["qmapsize"] = qnbaddrs[-1].cpu().int()
 
-    # print(nbsizes, kmap["qmapsize"])
     return kmap
