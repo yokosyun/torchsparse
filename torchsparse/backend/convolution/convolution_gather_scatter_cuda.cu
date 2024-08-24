@@ -720,26 +720,26 @@ at::Tensor conv_forward_gather_scatter_cuda_fallback(
   int mid_kernel = kernel_volume / 2;
   int in_buffer_size = 1;
   // we can precompute features for w[0,0] which avoids gather/scatter
-  // if (kernel_volume % 2 == 1 && n_in_feats == n_out_feats) {
-  //   precompute_mid = true;
-  //   in_buffer_size =
-  //       *std::max_element(neighbor_offset.data_ptr<int>(),
-  //                         neighbor_offset.data_ptr<int>() + mid_kernel);
-  //   in_buffer_size = std::max(
-  //       in_buffer_size,
-  //       *std::max_element(neighbor_offset.data_ptr<int>() + mid_kernel + 1,
-  //                         neighbor_offset.data_ptr<int>() + kernel_volume));
-  //   in_buffer_size = std::max(in_buffer_size, 1);
-  //   // (N, c) X (c, o) = (N, o)
-  //   // conv_mode == 2 indicates kernel has been reordered, in which case
-  //   // w[0,0] is placed at the end
-  //   int mid_kmap_idx = conv_mode != 2 ? kernel_volume / 2 : kernel_volume -
-  //   1; torch::mm_out(out_feat, in_feat, kernel[mid_kmap_idx]);
-  // } else {
-  in_buffer_size =
-      *std::max_element(neighbor_offset.data_ptr<int>(),
-                        neighbor_offset.data_ptr<int>() + kernel_volume);
-  // }
+  if (kernel_volume % 2 == 1 && n_in_feats == n_out_feats) {
+    precompute_mid = true;
+    in_buffer_size =
+        *std::max_element(neighbor_offset.data_ptr<int>(),
+                          neighbor_offset.data_ptr<int>() + mid_kernel);
+    in_buffer_size = std::max(
+        in_buffer_size,
+        *std::max_element(neighbor_offset.data_ptr<int>() + mid_kernel + 1,
+                          neighbor_offset.data_ptr<int>() + kernel_volume));
+    in_buffer_size = std::max(in_buffer_size, 1);
+    // (N, c) X (c, o) = (N, o)
+    // conv_mode == 2 indicates kernel has been reordered, in which case
+    // w[0,0] is placed at the end
+    int mid_kmap_idx = conv_mode != 2 ? kernel_volume / 2 : kernel_volume - 1;
+    torch::mm_out(out_feat, in_feat, kernel[mid_kmap_idx]);
+  } else {
+    in_buffer_size =
+        *std::max_element(neighbor_offset.data_ptr<int>(),
+                          neighbor_offset.data_ptr<int>() + kernel_volume);
+  }
   auto in_buffer = torch::zeros({in_buffer_size, n_in_channels}, options);
   auto out_buffer = torch::zeros({in_buffer_size, n_out_channels}, options);
   int cur_offset = 0;
