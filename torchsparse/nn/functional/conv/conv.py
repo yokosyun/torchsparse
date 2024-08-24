@@ -1,15 +1,13 @@
 from typing import List, Dict, Optional, Tuple, Union
-
-# import numpy as np
 import torch
-
-import torchsparse
 from torchsparse import SparseTensor
 from torchsparse.utils import make_ntuple
 
 from .func import *
 
 __all__ = ["conv3d"]
+
+import time
 
 
 def conv3d(
@@ -27,6 +25,7 @@ def conv3d(
 ) -> SparseTensor:
     from torchsparse.nn import functional as F
 
+    start_time_1 = time.time()
     feats, coords = input.feats, input.coords
     kernel_size = make_ntuple(kernel_size, ndim=3)
     # kernel_volume = np.prod(kernel_size)
@@ -53,6 +52,8 @@ def conv3d(
     elif dataflow == F.Dataflow.FetchOnDemand:
         ConvolutionFunction = FetchOnDemandConvolutionFuntion
         config.ifsort = False
+    elif dataflow == F.Dataflow.FetchImplicit:
+        ConvolutionFunction = FetchImplicitConvolutionFuntion
     elif (dataflow == F.Dataflow.CodedCSR
          ):  # Placeholder for PCEngine integration. Mode name can be modified.
         config.ifsort = False
@@ -111,6 +112,10 @@ def conv3d(
             input._caches.kmaps[(input.stride, kernel_size, stride,
                                  dilation)] = kmap
             input._caches.hashmaps[input.stride] = hashmap
+
+        end_time_1 = time.time()
+
+        start_time_2 = time.time()
 
         feats = ConvolutionFunction.apply(
             feats,
@@ -205,4 +210,8 @@ def conv3d(
     output._caches = input._caches
     output._caches.cmaps.setdefault(output.stride,
                                     (output.coords, output.spatial_range))
+
+    end_time_2 = time.time()
+    print("pre-process=", (end_time_1 - start_time_1) * 1e6,
+          (end_time_2 - start_time_2) * 1e6)
     return output
