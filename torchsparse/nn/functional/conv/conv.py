@@ -1,9 +1,5 @@
 from typing import List, Dict, Optional, Tuple, Union
-
-# import numpy as np
 import torch
-
-import torchsparse
 from torchsparse import SparseTensor
 from torchsparse.utils import make_ntuple
 
@@ -29,6 +25,7 @@ def conv3d(
 ) -> SparseTensor:
     from torchsparse.nn import functional as F
 
+    start_time_1 = time.time()
     feats, coords = input.feats, input.coords
     kernel_size = make_ntuple(kernel_size, ndim=3)
     # kernel_volume = np.prod(kernel_size)
@@ -92,7 +89,6 @@ def conv3d(
         spatial_range = input.spatial_range
 
         if kmap is None:
-            # start_time = time.time()
             kmap = F.build_kernel_map(
                 coords,
                 feats.shape[0],
@@ -117,8 +113,9 @@ def conv3d(
                                  dilation)] = kmap
             input._caches.hashmaps[input.stride] = hashmap
 
-            # end_time = time.time()
-            # print((end_time - start_time)*1000)
+        end_time_1 = time.time()
+
+        start_time_2 = time.time()
 
         feats = ConvolutionFunction.apply(
             feats,
@@ -213,4 +210,8 @@ def conv3d(
     output._caches = input._caches
     output._caches.cmaps.setdefault(output.stride,
                                     (output.coords, output.spatial_range))
+
+    end_time_2 = time.time()
+    print("pre-process=", (end_time_1 - start_time_1) * 1e6,
+          (end_time_2 - start_time_2) * 1e6)
     return output
