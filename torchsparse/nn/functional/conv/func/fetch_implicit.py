@@ -3,13 +3,8 @@ from typing import Dict
 import torch
 from torch.autograd import Function
 
-# from torch.cuda.amp import custom_bwd, custom_fwd
-
 import torchsparse
 import torchsparse.backend
-
-# TODO: Fetch_on_demand do not have backward kernels now.
-#       Using Gather_Scatter for backward propogation.
 
 __all__ = ["FetchImplicitConvolutionFuntion"]
 
@@ -17,7 +12,6 @@ __all__ = ["FetchImplicitConvolutionFuntion"]
 class FetchImplicitConvolutionFuntion(Function):
 
     @staticmethod
-    # @custom_fwd(cast_inputs=torch.half)
     def forward(
         ctx,
         input: torch.Tensor,
@@ -51,13 +45,6 @@ class FetchImplicitConvolutionFuntion(Function):
 
         input = input.contiguous()
         weight = weight.contiguous()
-
-        # nbmaps = nbmaps.int().contiguous()
-        # input_nbmaps = input_nbmaps.int().contiguous()
-        # output_nbmaps = output_nbmaps.int().contiguous()
-        # nbaddrs = nbaddrs.int().contiguous()
-        # qnbaddrs = qnbaddrs.int().contiguous()
-        # nbsizes = nbsizes.int().contiguous()
 
         if not input.device.type == "cuda":
             if not transposed:
@@ -114,25 +101,11 @@ class FetchImplicitConvolutionFuntion(Function):
                 reorder_out_in_map = kmap["reorder_out_in_map"]
                 reduced_sorted_mask = kmap["reduced_sorted_mask"]
                 reorder_loc = kmap["reorder_loc"]
-                # out_in_map_bwd = kmap["out_in_map_bwd"]
-                # reorder_out_in_map_bwd = kmap["reorder_out_in_map_bwd"]
-                # reduced_sorted_mask_bwd_wgrad = kmap[
-                #     "reduced_sorted_mask_bwd_wgrad"]
-                # reduced_sorted_mask_bwd_dgrad = kmap[
-                #     "reduced_sorted_mask_bwd_dgrad"]
-                # reorder_loc_bwd = kmap["reorder_loc_bwd"]
             else:
                 out_in_map = kmap["out_in_map_t"]
                 reorder_out_in_map = kmap["reorder_out_in_map_t"]
                 reduced_sorted_mask = kmap["reduced_sorted_mask_t"]
                 reorder_loc = kmap["reorder_loc_t"]
-                # out_in_map_bwd = kmap["out_in_map_bwd_t"]
-                # reorder_out_in_map_bwd = kmap["reorder_out_in_map_bwd_t"]
-                # reduced_sorted_mask_bwd_wgrad = kmap[
-                #     "reduced_sorted_mask_bwd_wgrad_t"]
-                # reduced_sorted_mask_bwd_dgrad = kmap[
-                #     "reduced_sorted_mask_bwd_dgrad_t"]
-                # reorder_loc_bwd = kmap["reorder_loc_bwd_t"]
 
             ifsort = config["ifsort"]
             num_out_feats = sizes[1] if not transposed else sizes[0]
@@ -140,15 +113,6 @@ class FetchImplicitConvolutionFuntion(Function):
 
             if not ifsort:
                 assert False, "ifsort = False is not supported"
-                output_implicit = torchsparse.backend.conv_forward_implicit_gemm_cuda(
-                    input,
-                    weight,
-                    out_in_map,
-                    num_out_feats,
-                    num_out_channels,
-                    torchsparse.backends.allow_tf32,
-                    torchsparse.backends.allow_fp16,
-                )
             else:
                 output_implicit = torchsparse.backend.conv_forward_implicit_gemm_sorted_cuda(
                     input,
@@ -161,7 +125,6 @@ class FetchImplicitConvolutionFuntion(Function):
                     torchsparse.backends.allow_tf32,
                     torchsparse.backends.allow_fp16,
                 )
-
         else:
             raise NotImplementedError
 
@@ -169,43 +132,3 @@ class FetchImplicitConvolutionFuntion(Function):
 
         ctx.for_backwards = (input, weight, nbmaps, nbsizes, transposed)
         return output.to(weight.dtype)
-
-    @staticmethod
-    # @custom_bwd
-    def backward(ctx, grad_output: torch.Tensor):
-        input, weight, nbmaps, nbsizes, transposed = ctx.for_backwards
-
-        if grad_output.dtype != weight.dtype:
-            grad_output = grad_output.to(weight.dtype)
-
-        print(
-            "[Warning] Fetch_On_Demand does not have backward kernels now. Use Gather-Scatter for backward."
-        )
-        grad_input = torch.zeros_like(input)
-        grad_weight = torch.zeros_like(weight)
-
-        if grad_output.device.type == "cuda":
-            torchsparse.backend.conv_backward_gather_scatter_cuda(
-                input,
-                grad_input,
-                grad_output.contiguous(),
-                weight,
-                grad_weight,
-                nbmaps,
-                nbsizes.cpu(),
-                transposed,
-            )
-        elif grad_output.device.type == "cpu":
-            torchsparse.backend.conv_backward_gather_scatter_cpu(
-                input,
-                grad_input,
-                grad_output.contiguous(),
-                weight,
-                grad_weight,
-                nbmaps,
-                nbsizes.cpu(),
-                transposed,
-            )
-        else:
-            raise NotImplementedError
-        return (grad_input, grad_weight, None, None, None, None)
