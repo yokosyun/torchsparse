@@ -72,27 +72,64 @@ def generate_batched_random_point_clouds(size, voxel_size, batch_size=1):
 
 def dummy_train_3x3(device):
     torch.cuda.set_device(0)
+    if False:
+        model = nn.Sequential(
+            spnn.Conv3d(4, 16, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(16, 32, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(32, 32, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(32, 64, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(64, 64, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(64, 128, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(128, 128, kernel_size=3, stride=1, padding=1),
+            # spnn.Conv3d(128, 256, kernel_size=3, stride=1, padding=1),
+            # spnn.Conv3d(256, 256, kernel_size=3, stride=1, padding=1),
+            # spnn.Conv3d(256, 128, kernel_size=3, stride=1, padding=1, **kargs2),
+            # spnn.Conv3d(128, 64, kernel_size=3, stride=1, padding=1, **kargs2),
+            # spnn.Conv3d(64, 32, kernel_size=3, stride=1, padding=1, **kargs2),
+            # spnn.Conv3d(32, 10, kernel_size=3, stride=1, padding=1, **kargs2),
+        )
+    elif True:
+        model = nn.Sequential(
+            spnn.Conv3d(4, 16, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(16, 16, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(16, 16, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(16, 16, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(16, 16, kernel_size=3, stride=1, padding=1),
+            # spnn.MaxPool3d(kernel_size=2),
+            spnn.Conv3d(16, 32, kernel_size=2, stride=2, padding=0),
+            # spnn.Conv3d(16, 32, kernel_size=3, stride=2, padding=1),
+            spnn.Conv3d(32, 32, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(32, 32, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(32, 32, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(32, 32, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(32, 64, kernel_size=2, stride=2, padding=0),
+            # spnn.Conv3d(32, 64, kernel_size=3, stride=2, padding=1),
+            spnn.Conv3d(64, 64, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(64, 64, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(64, 64, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(64, 64, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(64, 128, kernel_size=2, stride=2, padding=0),
+            # spnn.Conv3d(64, 128, kernel_size=3, stride=2, padding=1),
+            spnn.Conv3d(128, 128, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(128, 128, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(128, 128, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(128, 128, kernel_size=3, stride=1, padding=1),
 
-    model = nn.Sequential(
-        spnn.Conv3d(4, 16, kernel_size=3, stride=1, **kargs1),
-        spnn.Conv3d(16, 32, kernel_size=3, stride=1, **kargs1),
-        spnn.Conv3d(32, 32, kernel_size=3, stride=1, **kargs1),
-        spnn.Conv3d(32, 64, kernel_size=3, stride=1, **kargs1),
-        spnn.Conv3d(64, 64, kernel_size=3, stride=1, **kargs1),
-        spnn.Conv3d(64, 128, kernel_size=3, stride=1, **kargs1),
-        spnn.Conv3d(128, 128, kernel_size=3, stride=1, **kargs1),
-        # spnn.Conv3d(128, 256, kernel_size=3, stride=1, **kargs1),
-        # spnn.Conv3d(256, 256, kernel_size=3, stride=1, **kargs1),
-        # spnn.Conv3d(256, 128, kernel_size=3, stride=1, **kargs1, **kargs2),
-        # spnn.Conv3d(128, 64, kernel_size=3, stride=1, **kargs1, **kargs2),
-        # spnn.Conv3d(64, 32, kernel_size=3, stride=1, **kargs1, **kargs2),
-        # spnn.Conv3d(32, 10, kernel_size=3, stride=1, **kargs1, **kargs2),
-    ).to(device)
+            # spnn.Conv3d(128, 128, kernel_size=, stride=1, padding=1),
+        )
+    else:
+        from torchsparse.backbones.resnet import SparseResNet21D
+        from torchsparse.backbones.unet import SparseResUNet42
+        model = SparseResNet21D()
+        # model = SparseResUNet42()
 
+    model = model.to(device)
     model.eval()
 
     feed_dict = generate_batched_random_point_clouds(size=NUM_PC,
                                                      voxel_size=VOXEL_SIZE)
+    print(feed_dict["input"].feats.shape)
+    print(feed_dict["input"].coords.shape)
 
     with torch.no_grad():
         if False:
@@ -100,9 +137,9 @@ def dummy_train_3x3(device):
                     profile_memory=True,
                     use_cuda=True,
                     schedule=torch.profiler.schedule(wait=1,
-                                                     warmup=1,
-                                                     active=2,
-                                                     repeat=1),
+                                                     warmup=2,
+                                                     active=10,
+                                                     repeat=2),
             ) as prof:
                 with profiler.record_function("model_inference"):
                     for _ in range(100):
@@ -127,10 +164,13 @@ def dummy_train_3x3(device):
 
             active_iter = 100
 
-            for _ in range(active_iter):
+            for iter in range(active_iter):
+                print("------active_iter---------", iter)
                 start_time = time.time()
                 inputs._caches = TensorCache()
-                model(inputs)
+                outputs = model(inputs)
+                print(outputs.coords.shape, outputs.stride,
+                      outputs.spatial_range)
                 end_time = time.time()
                 duration = (end_time - start_time) * 1000
 
@@ -143,16 +183,8 @@ def dummy_train_3x3(device):
 if __name__ == "__main__":
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-    use_sparse = False
-    import torch.nn as spnn
-
-    # kargs1 = {"padding": 1}
-    # kargs2 = {}
-    # dummy_train_3x3(device)
-
     use_sparse = True
     import torchsparse.nn as spnn
 
-    kargs1 = {}
     kargs2 = {"transposed": True}
     dummy_train_3x3(device)
