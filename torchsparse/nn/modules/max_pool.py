@@ -9,7 +9,8 @@ XYZ_DIM = 3  # [X,Y,Z]
 # BXYZ_DIM = 4  # [B,X,Y,Z]
 
 
-def encode_coordinate(in_coords: Tensor, coords_min, coords_max) -> Tensor:
+def encode_coordinate(in_coords: Tensor, coords_min: Tensor,
+                      coords_max: Tensor) -> Tensor:
     """ (((b) * X_SIZE + y) * Y_SIZE + z ) * Z_SIZE + z
     Args:
         in_coords (Tensor): [L, BXYZ_DIM]

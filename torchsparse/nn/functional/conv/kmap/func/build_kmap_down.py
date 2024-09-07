@@ -1,6 +1,5 @@
 import torch
 from torch import Tensor
-# from max_pool import encode_coordinate, generate_rand_input
 from torchsparse.nn.modules.max_pool import encode_coordinate, generate_rand_input, decode_coordinate
 """
 <my kmap>
@@ -21,8 +20,8 @@ scatter
 
 
 def build_kernel_map_downsample(in_coords: Tensor,
-                                coords_min,
-                                coords_max,
+                                coords_min: Tensor,
+                                coords_max: Tensor,
                                 kernel_size: int = 2):
     kernel_volume = kernel_size ** 3
 
