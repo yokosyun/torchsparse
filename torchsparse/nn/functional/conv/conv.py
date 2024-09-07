@@ -25,6 +25,8 @@ def conv3d(
 ) -> SparseTensor:
     from torchsparse.nn import functional as F
 
+    assert input.feats.shape[1] == weight.shape[1], "input channel must matched"
+
     start_time_1 = time.time()
     feats, coords = input.feats, input.coords
     kernel_size = make_ntuple(kernel_size, ndim=3)
@@ -114,7 +116,6 @@ def conv3d(
             input._caches.hashmaps[input.stride] = hashmap
 
         end_time_1 = time.time()
-
         start_time_2 = time.time()
 
         feats = ConvolutionFunction.apply(
@@ -210,8 +211,7 @@ def conv3d(
     output._caches = input._caches
     output._caches.cmaps.setdefault(output.stride,
                                     (output.coords, output.spatial_range))
-
     end_time_2 = time.time()
-    print("pre-process=", (end_time_1 - start_time_1) * 1e6,
+    print("process=", (end_time_1 - start_time_1) * 1e6,
           (end_time_2 - start_time_2) * 1e6)
     return output
