@@ -6,7 +6,6 @@ from torchsparse import SparseTensor
 __all__ = ["MaxPool3d"]
 
 XYZ_DIM = 3  # [X,Y,Z]
-# BXYZ_DIM = 4  # [B,X,Y,Z]
 
 
 def encode_coordinate(in_coords: Tensor, coords_min: Tensor,
@@ -22,7 +21,7 @@ def encode_coordinate(in_coords: Tensor, coords_min: Tensor,
     """
     BXYZ_DIM = 4
 
-    # assert in_coords.shape[1] == BXYZ_DIM
+    assert in_coords.shape[1] == BXYZ_DIM
 
     sizes = coords_max - coords_min + 1
 
