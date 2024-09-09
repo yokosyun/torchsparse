@@ -88,13 +88,44 @@ def dummy_train_3x3(device):
             # spnn.Conv3d(64, 32, kernel_size=3, stride=1, padding=1, **kargs2),
             # spnn.Conv3d(32, 10, kernel_size=3, stride=1, padding=1, **kargs2),
         )
-    elif True:
+    elif False:
         model = nn.Sequential(
             spnn.Conv3d(4, 16, kernel_size=3, stride=1, padding=1),
             spnn.Conv3d(16, 16, kernel_size=3, stride=1, padding=1),
             spnn.Conv3d(16, 16, kernel_size=3, stride=1, padding=1),
             spnn.Conv3d(16, 16, kernel_size=3, stride=1, padding=1),
             spnn.Conv3d(16, 16, kernel_size=3, stride=1, padding=1),
+
+            # spnn.MaxPool3d(kernel_size=2),
+            spnn.Conv3d(16, 32, kernel_size=2, stride=2, padding=0),
+            # spnn.Conv3d(16, 32, kernel_size=3, stride=2, padding=1),
+            spnn.Conv3d(32, 32, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(32, 32, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(32, 32, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(32, 32, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(32, 64, kernel_size=2, stride=2, padding=0),
+            # spnn.Conv3d(32, 64, kernel_size=3, stride=2, padding=1),
+            spnn.Conv3d(64, 64, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(64, 64, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(64, 64, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(64, 64, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(64, 128, kernel_size=2, stride=2, padding=0),
+            # spnn.Conv3d(64, 128, kernel_size=3, stride=2, padding=1),
+            spnn.Conv3d(128, 128, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(128, 128, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(128, 128, kernel_size=3, stride=1, padding=1),
+            spnn.Conv3d(128, 128, kernel_size=3, stride=1, padding=1),
+
+            # spnn.Conv3d(128, 128, kernel_size=, stride=1, padding=1),
+        )
+    elif True:
+        model = nn.Sequential(
+            spnn.Conv3d(4, 16, kernel_size=5, stride=1, padding=1),
+            spnn.Conv3d(16, 16, kernel_size=5, stride=1, padding=1),
+            spnn.Conv3d(16, 16, kernel_size=5, stride=1, padding=1),
+            spnn.Conv3d(16, 16, kernel_size=5, stride=1, padding=1),
+            spnn.Conv3d(16, 16, kernel_size=5, stride=1, padding=1),
+
             # spnn.MaxPool3d(kernel_size=2),
             spnn.Conv3d(16, 32, kernel_size=2, stride=2, padding=0),
             # spnn.Conv3d(16, 32, kernel_size=3, stride=2, padding=1),
