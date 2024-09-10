@@ -82,8 +82,7 @@ def sparse_max_pool_1d(in_feats: Tensor, in_coords: Tensor,
     coords_min, _ = torch.min(in_coords, dim=0)
     coords_max, _ = torch.max(in_coords, dim=0)
 
-    enc_coords, min_coords, max_coords = encode_coordinate(
-        out_coords, coords_min, coords_max)
+    enc_coords = encode_coordinate(out_coords, coords_min, coords_max)
 
     enc_coords, inv_idx = torch.unique(enc_coords,
                                        sorted=False,
@@ -99,7 +98,7 @@ def sparse_max_pool_1d(in_feats: Tensor, in_coords: Tensor,
     # reduce same coordinate
     out_feats.index_reduce_(0, inv_idx, in_feats, 'amax', include_self=False)
 
-    out_coords = decode_coordinate(enc_coords, min_coords, max_coords)
+    out_coords = decode_coordinate(enc_coords, coords_min, coords_max)
 
     return out_feats, out_coords
 
