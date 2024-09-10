@@ -28,11 +28,11 @@ def build_kernel_map_downsample(in_coords: Tensor,
     down_coords = torch.cat(
         (in_coords[:, 0:1], in_coords[:, 1:] // kernel_size), dim=1)
 
-    kernel_offset = in_coords[:, 1:] % 2
+    kernel_offset = in_coords[:, 1:] % kernel_size
     kernel_offset = kernel_offset[:,
                                   2] + kernel_offset[:,
-                                                     1] * 2 + kernel_offset[:,
-                                                                            0] * 2 ** 2
+                                                     1] * kernel_size + kernel_offset[:,
+                                                                                      0] * kernel_size ** 2
     enc_coords = encode_coordinate(down_coords, coords_min, coords_max)
 
     enc_unique_coords, out_idx = torch.unique(enc_coords,
