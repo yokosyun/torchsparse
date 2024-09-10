@@ -25,8 +25,8 @@ def build_kernel_map_downsample(in_coords: Tensor,
                                 kernel_size: int = 2):
     kernel_volume = kernel_size ** 3
 
-    down_coords = in_coords.clone()
-    down_coords[:, 1:] = down_coords[:, 1:] // kernel_size
+    down_coords = torch.cat(
+        (in_coords[:, 0:1], in_coords[:, 1:] // kernel_size), dim=1)
 
     kernel_offset = in_coords[:, 1:] % 2
     kernel_offset = kernel_offset[:,
