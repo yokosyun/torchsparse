@@ -16,8 +16,8 @@ _global_conv_config = None
 _default_conv_config = AttributeDict([
     # ("dataflow", Dataflow.ImplicitGEMM),
     # ("dataflow", Dataflow.GatherScatter),  # conv_mode=2 doesn't work
-    # ("dataflow", Dataflow.FetchOnDemand),
-    ("dataflow", Dataflow.FetchImplicit),
+    ("dataflow", Dataflow.FetchOnDemand),
+    # ("dataflow", Dataflow.FetchImplicit),
     ("conv_mode", 1),  # torchsparse/backends.py benchmark=True
     ("ifsort", True),
     ("kmap_mode", "hashmap_on_the_fly"),
