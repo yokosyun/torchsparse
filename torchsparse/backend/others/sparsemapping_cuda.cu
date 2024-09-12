@@ -9,6 +9,52 @@
 #define NDim 4
 #define MAX_KVOL 27
 
+at::Tensor encode_coordinate(const at::Tensor &in_coords,
+                             const at::Tensor &coords_min,
+                             const at::Tensor &coords_max) {
+  int BXYZ_DIM = 4;
+
+  AT_ASSERT(in_coords.size(1) == BXYZ_DIM);
+
+  at::Tensor sizes = coords_max - coords_min + 1;
+
+  auto options = torch::TensorOptions()
+                     .dtype(in_coords.dtype())
+                     .device(in_coords.device());
+
+  at::Tensor cur = at::zeros({in_coords.size(0)}, options);
+
+  for (int i = 0; i < BXYZ_DIM; ++i) {
+    cur *= sizes[i];
+    cur += (in_coords.select(1, i) - coords_min[i]);
+  }
+
+  return cur;
+}
+
+at::Tensor decode_coordinate(const at::Tensor &in_coords,
+                             const at::Tensor &coords_min,
+                             const at::Tensor &coords_max) {
+  int BXYZ_DIM = 4;
+
+  at::Tensor cur = in_coords.clone();
+
+  auto options = torch::TensorOptions()
+                     .dtype(in_coords.dtype())
+                     .device(in_coords.device());
+
+  at::Tensor out_coords = at::zeros({in_coords.size(0), BXYZ_DIM}, options);
+
+  at::Tensor sizes = coords_max - coords_min + 1;
+
+  for (int idx = BXYZ_DIM - 1; idx >= 0; --idx) {
+    out_coords.select(1, idx) = coords_min[idx] + cur % sizes[idx];
+    cur = at::div(cur, sizes[idx], "floor");
+  }
+
+  return out_coords;
+}
+
 template <typename type_int>  // int32_t or int64_t
 __host__ __device__ inline type_int transform_coords(int *in_coords,
                                                      int *coords_min,
@@ -415,6 +461,61 @@ std::vector<at::Tensor> build_kernel_map_downsample_hashmap_int32(
       out_kmap, out_in_map);
 
   return {_out_in_map, final_out_coords};
+}
+
+std::vector<at::Tensor> build_kernel_map_downsample_torch(
+    hashtable &table, at::Tensor _in_coords, at::Tensor _coords_min,
+    at::Tensor _coords_max, at::Tensor _kernel_sizes, at::Tensor _stride,
+    at::Tensor _padding, bool to_insert) {
+  int kernel_volume = (int)(torch::prod(_kernel_sizes).item<int>());
+  auto options = torch::TensorOptions()
+                     .dtype(at::ScalarType::Int)
+                     .device(_in_coords.device());
+  auto options_long = torch::TensorOptions()
+                          .dtype(at::ScalarType::Long)
+                          .device(_in_coords.device());
+
+  at::Tensor down_coords = at::cat(
+      {at::unsqueeze(_in_coords.select(1, 0), 1),
+       _in_coords.slice(1, 1, _in_coords.size(1)).div(_kernel_sizes, "floor")},
+      1);
+
+  at::Tensor kernel_offset_3d =
+      _in_coords.slice(1, 1, _in_coords.size(1)) % _kernel_sizes.select(0, 0);
+  at::Tensor kernel_offset_1d = kernel_offset_3d.select(1, 2) +
+                                kernel_offset_3d.select(1, 1) * 2 +
+                                kernel_offset_3d.select(1, 0) * 4;
+
+  at::Tensor enc_coords =
+      encode_coordinate(down_coords, _coords_min, _coords_max);
+
+  auto unique =
+      at::unique_dim(enc_coords, /*dim=*/0, /*sorted=*/false,
+                     /*return_inverse=*/true, /*return_counts=*/false);
+
+  auto enc_unique_coords = std::get<0>(unique);
+  auto out_idx = std::get<1>(unique);
+
+  auto scatter_index = out_idx * kernel_volume + kernel_offset_1d;
+
+  int divisor = table.get_divisor();
+  at::Tensor _out_in_map = torch::full(
+      {((enc_unique_coords.size(0) + divisor - 1) / divisor * divisor) *
+       kernel_volume},
+      -1, options);
+
+  int scalar_value = _in_coords.size(0);
+  at::Scalar num_in_coords =
+      at::from_blob(&scalar_value, {1}, at::dtype<int>()).item();
+
+  at::Tensor in_idx = at::arange(num_in_coords, options);
+
+  _out_in_map = at::scatter(_out_in_map, 0, scatter_index, in_idx);
+
+  at::Tensor out_coords =
+      decode_coordinate(enc_unique_coords, _coords_min, _coords_max);
+
+  return {_out_in_map.reshape({-1, kernel_volume}), out_coords};
 }
 
 std::vector<at::Tensor> build_kernel_map_downsample_hashmap(

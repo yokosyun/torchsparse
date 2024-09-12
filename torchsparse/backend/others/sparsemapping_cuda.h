@@ -18,6 +18,11 @@ std::vector<at::Tensor> build_kernel_map_downsample_hashmap(
     at::Tensor _coords_max, at::Tensor _kernel_sizes, at::Tensor _stride,
     at::Tensor _padding, bool to_insert);
 
+std::vector<at::Tensor> build_kernel_map_downsample_torch(
+    hashtable& table, at::Tensor _in_coords, at::Tensor _coords_min,
+    at::Tensor _coords_max, at::Tensor _kernel_sizes, at::Tensor _stride,
+    at::Tensor _padding, bool to_insert);
+
 std::vector<at::Tensor> build_kernel_map_subm_hashmap_int32(
     hashtable32& table, at::Tensor _in_coords, at::Tensor _coords_min,
     at::Tensor _coords_max, at::Tensor _kernel_sizes, at::Tensor _stride,
