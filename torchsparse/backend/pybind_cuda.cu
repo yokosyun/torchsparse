@@ -92,6 +92,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("reduce_bitmask_cuda", &reduce_bitmask_cuda);
   m.def("reorder_out_in_map_cuda", &reorder_out_in_map_cuda);
   m.def("build_kernel_map_subm_hashmap", &build_kernel_map_subm_hashmap);
+  m.def("build_kernel_map_downsample_torch",
+        &build_kernel_map_downsample_torch);
   m.def("build_kernel_map_downsample_hashmap",
         &build_kernel_map_downsample_hashmap);
   m.def("build_kernel_map_subm_hashmap_int32",
