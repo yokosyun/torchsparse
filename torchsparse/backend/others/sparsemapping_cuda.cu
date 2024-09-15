@@ -9,9 +9,8 @@
 #define NDim 4
 #define MAX_KVOL 27
 
-at::Tensor encode_coordinate(const at::Tensor &in_coords,
-                             const at::Tensor &coords_min,
-                             const at::Tensor &coords_max) {
+at::Tensor bxyz2flat(const at::Tensor &in_coords, const at::Tensor &coords_min,
+                     const at::Tensor &coords_max) {
   int BXYZ_DIM = 4;
 
   AT_ASSERT(in_coords.size(1) == BXYZ_DIM);
@@ -32,9 +31,8 @@ at::Tensor encode_coordinate(const at::Tensor &in_coords,
   return cur;
 }
 
-at::Tensor decode_coordinate(const at::Tensor &in_coords,
-                             const at::Tensor &coords_min,
-                             const at::Tensor &coords_max) {
+at::Tensor flat2bxyz(const at::Tensor &in_coords, const at::Tensor &coords_min,
+                     const at::Tensor &coords_max) {
   int BXYZ_DIM = 4;
 
   at::Tensor cur = in_coords.clone();
@@ -486,8 +484,7 @@ std::vector<at::Tensor> build_kernel_map_downsample_torch(
                                 kernel_offset_3d.select(1, 1) * 2 +
                                 kernel_offset_3d.select(1, 0) * 4;
 
-  at::Tensor enc_coords =
-      encode_coordinate(down_coords, _coords_min, _coords_max);
+  at::Tensor enc_coords = bxyz2flat(down_coords, _coords_min, _coords_max);
 
   auto unique =
       at::unique_dim(enc_coords, /*dim=*/0, /*sorted=*/false,
@@ -513,7 +510,7 @@ std::vector<at::Tensor> build_kernel_map_downsample_torch(
   _out_in_map = at::scatter(_out_in_map, 0, scatter_index, in_idx);
 
   at::Tensor out_coords =
-      decode_coordinate(enc_unique_coords, _coords_min, _coords_max);
+      flat2bxyz(enc_unique_coords, _coords_min, _coords_max);
 
   return {_out_in_map.reshape({-1, kernel_volume}), out_coords};
 }

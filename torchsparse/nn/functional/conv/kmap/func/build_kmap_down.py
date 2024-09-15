@@ -1,6 +1,6 @@
 import torch
 from torch import Tensor
-from torchsparse.nn.modules.max_pool import encode_coordinate, generate_rand_input, decode_coordinate
+from torchsparse.nn.modules.flat_coord import bxyz2flat, generate_rand_input, flat2bxyz
 """
 <my kmap>
 full -1
@@ -33,7 +33,7 @@ def build_kernel_map_downsample(in_coords: Tensor,
                                   2] + kernel_offset[:,
                                                      1] * 2 + kernel_offset[:,
                                                                             0] * 2 ** 2
-    enc_coords = encode_coordinate(down_coords, coords_min, coords_max)
+    enc_coords = bxyz2flat(down_coords, coords_min, coords_max)
 
     enc_unique_coords, out_idx = torch.unique(enc_coords,
                                               sorted=False,
@@ -55,7 +55,7 @@ def build_kernel_map_downsample(in_coords: Tensor,
 
     out_in_map = out_in_map.scatter_(0, scatter_index, in_idx)
 
-    out_coords = decode_coordinate(enc_unique_coords, coords_min, coords_max)
+    out_coords = flat2bxyz(enc_unique_coords, coords_min, coords_max)
 
     return out_in_map.reshape(-1, kernel_volume), out_coords
 
