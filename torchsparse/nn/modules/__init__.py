@@ -5,3 +5,4 @@ from .crop import *
 from .norm import *
 from .pooling import *
 from .max_pool import *
+from .flat_coord import *
